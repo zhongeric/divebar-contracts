@@ -62,26 +62,15 @@ const main = async () => {
     await sleep(5000);
 
     // game should be over now, call handleGameOver
-    await depositContract.handleGameOver();
+
+    await depositContract.handleGameOver({
+        value: ethers.utils.parseEther('4000'),
+    });
     console.log('Game over');
 
     // Verify new game has been created
     gameInfo = await depositContract.getGameInfo();
     console.log('Game info:', gameInfo);
-
-    // // Payout winnings
-    // const payoutAmount = ethers.utils.parseEther('420');
-    // await depositContract.payoutWinnings({
-    //     value: payoutAmount,
-    // });
-    // console.log('Paid out winnings');
-
-    // // get balances of addr1 and addr2
-    // addr1Balance = await ethers.provider.getBalance(addr1.address);
-    // console.log('addr1 balance:', ethers.utils.formatEther(addr1Balance));
-
-    // addr2Balance = await ethers.provider.getBalance(addr2.address);
-    // console.log('addr2 balance:', ethers.utils.formatEther(addr2Balance));
   };
   
   const runMain = async () => {

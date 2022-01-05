@@ -11,6 +11,11 @@ import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 contract Deposits is ReentrancyGuard {
     using SafeMath for uint256;
 
+    uint256 public constant DEFAULT_MIN_DEPOSIT = 0.001 ether;
+    uint256 public constant DEFAULT_POT = 0 ether;
+    uint256 public constant DEFAULT_AVG = 0 ether;
+    uint256 public constant DEFAULT_PLAYERS_SIZE = 0;
+
     struct Player {
         address addr;
         uint256 bet;
@@ -37,17 +42,19 @@ contract Deposits is ReentrancyGuard {
     event Withdraw(address indexed sender, uint256 amount);
     event Payout(address indexed receiver, uint256 amount);
 
-    Game private currentGame;
+    mapping(uint256 => Game) games;
+    uint256 private _cgid = 0;
 
     constructor() payable {
         owner = payable(msg.sender);
         // Create a new game
-        currentGame.id = 0;
-        currentGame.timeLimit = 5;
-        currentGame.minDeposit = 0.0001 ether;
-        currentGame.pot = 0 ether;
-        currentGame.avg = 0 ether;
-        currentGame.playersSize = 0;
+        Game storage currentGame = games[_cgid];
+        currentGame.id = _cgid;
+        currentGame.timeLimit = 5 seconds;
+        currentGame.minDeposit = DEFAULT_MIN_DEPOSIT;
+        currentGame.pot = DEFAULT_POT;
+        currentGame.avg = DEFAULT_AVG;
+        currentGame.playersSize = DEFAULT_PLAYERS_SIZE;
         currentGame.createdAt = block.timestamp;
         currentGame.endingAt = block.timestamp + currentGame.timeLimit;
     }
@@ -55,31 +62,31 @@ contract Deposits is ReentrancyGuard {
     // Function to receive Ether. msg.data must be empty
     receive() external payable {
         require(
-            msg.value >= currentGame.minDeposit,
+            msg.value >= games[_cgid].minDeposit,
             "Deposit must be greater than or equal to the minimum deposit"
         );
         // all players are new to the game, can only enter once
         // continue only if the player is not in the game already
         require(
-            currentGame.existingPlayers[msg.sender] == 0,
+            games[_cgid].existingPlayers[msg.sender] == 0,
             "You are already in the game"
         );
         // make sure the game is not over
-        require(currentGame.endingAt > block.timestamp, "The game has ended");
+        require(games[_cgid].endingAt > block.timestamp, "The game has ended");
 
         // First real player at 1, so non existent players are 0
-        currentGame.players[currentGame.playersSize + 1] = Player({
+        games[_cgid].players[games[_cgid].playersSize + 1] = Player({
             addr: msg.sender,
             bet: msg.value,
             winnings: 0,
             timestamp: block.timestamp
         });
-        currentGame.existingPlayers[msg.sender] = currentGame.playersSize + 1;
-        currentGame.playersSize += 1;
+        games[_cgid].existingPlayers[msg.sender] = games[_cgid].playersSize + 1;
+        games[_cgid].playersSize += 1;
         // Add deposit to the pot
-        currentGame.pot += msg.value;
-        console.log("Msg.value: ", msg.value);
-        console.log("Pot: ", currentGame.pot);
+        games[_cgid].pot += msg.value;
+        // Calculate the new average
+        games[_cgid].avg = games[_cgid].pot / games[_cgid].playersSize;
         // emit Deposit event
         emit Deposit(msg.sender, msg.value);
     }
@@ -93,10 +100,10 @@ contract Deposits is ReentrancyGuard {
     }
 
     function secondsRemaining() public view returns (uint256) {
-        if (currentGame.endingAt <= block.timestamp) {
+        if (games[_cgid].endingAt <= block.timestamp) {
             return 0; // already there
         } else {
-            return currentGame.endingAt - block.timestamp;
+            return games[_cgid].endingAt - block.timestamp;
         }
     }
 
@@ -105,25 +112,25 @@ contract Deposits is ReentrancyGuard {
         public
         view
         returns (
-            uint256,
-            uint256,
-            uint256,
-            uint256,
-            uint256,
-            uint256,
-            uint256,
-            uint256
+            uint256 id,
+            uint256 timeLimit,
+            uint256 minDeposit,
+            uint256 pot,
+            uint256 avg,
+            uint256 playersSize,
+            uint256 createdAt,
+            uint256 endingAt
         )
     {
         return (
-            currentGame.id,
-            currentGame.timeLimit,
-            currentGame.minDeposit,
-            currentGame.pot,
-            currentGame.avg,
-            currentGame.playersSize,
-            currentGame.createdAt,
-            currentGame.endingAt
+            games[_cgid].id,
+            games[_cgid].timeLimit,
+            games[_cgid].minDeposit,
+            games[_cgid].pot,
+            games[_cgid].avg,
+            games[_cgid].playersSize,
+            games[_cgid].createdAt,
+            games[_cgid].endingAt
         );
     }
 
@@ -136,19 +143,29 @@ contract Deposits is ReentrancyGuard {
         require(secondsRemaining() == 0, "Game is not over yet");
         payoutWinnings();
         // create a new game
-        currentGame.id = currentGame.id + 1;
+        _cgid += 1;
+        Game storage currentGame = games[_cgid];
+        currentGame.id = _cgid;
+        currentGame.timeLimit = 5 seconds;
+        currentGame.minDeposit = DEFAULT_MIN_DEPOSIT;
+        currentGame.pot = DEFAULT_POT;
+        currentGame.avg = DEFAULT_AVG;
+        currentGame.playersSize = DEFAULT_PLAYERS_SIZE;
         currentGame.createdAt = block.timestamp;
         currentGame.endingAt = block.timestamp + currentGame.timeLimit;
     }
 
     function payoutWinnings() private {
         // Iterate through players
-        for (uint256 i = 1; i <= currentGame.playersSize; i++) {
+        for (uint256 i = 1; i <= games[_cgid].playersSize; i++) {
             // send winnings to player
-            sendViaCall(payable(currentGame.players[i].addr));
+
+            sendViaCall(payable(games[_cgid].players[i].addr));
+            // subtract winnings from pot
+            games[_cgid].pot -= msg.value;
             // emit Payout event
-            emit Payout(currentGame.players[i].addr, 0.1 ether);
-            console.log("Payout sent to: ", currentGame.players[i].addr);
+            emit Payout(games[_cgid].players[i].addr, msg.value);
+            console.log("Payout sent to: ", games[_cgid].players[i].addr);
         }
     }
 
