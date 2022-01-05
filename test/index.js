@@ -103,7 +103,7 @@ describe("Main suite", function () {
 
     // Add a new deposit from addr1
     // Send ether to the contract
-    const depositAmount = ethers.utils.parseEther('9');
+    const depositAmount = ethers.utils.parseEther('9000');
     await addr1.sendTransaction({
         to: depositContract.address,
         value: depositAmount,
@@ -111,13 +111,13 @@ describe("Main suite", function () {
 
     let gameInfo = await depositContract.getGameInfo();
     expect(gameInfo.id.toString()).to.equal('0');
-    expect(ethers.utils.formatEther(gameInfo.pot)).to.equal('9.0');
+    expect(ethers.utils.formatEther(gameInfo.pot)).to.equal('9000.0');
     expect(Number(ethers.utils.formatEther(gameInfo.avg))).to.equal(ethers.utils.formatEther(gameInfo.pot) / gameInfo.playersSize.toNumber());
     expect(gameInfo.playersSize.toNumber()).to.equal(1);
 
     // Add a new deposit from addr2
     // Send ether to the contract
-    const depositAmountAddr2 = ethers.utils.parseEther('3');
+    const depositAmountAddr2 = ethers.utils.parseEther('6000');
     await addr2.sendTransaction({
         to: depositContract.address,
         value: depositAmountAddr2,
@@ -125,13 +125,13 @@ describe("Main suite", function () {
 
     gameInfo = await depositContract.getGameInfo();
     expect(gameInfo.id.toString()).to.equal('0');
-    expect(ethers.utils.formatEther(gameInfo.pot)).to.equal('12.0');
+    expect(ethers.utils.formatEther(gameInfo.pot)).to.equal('15000.0');
     expect(Number(ethers.utils.formatEther(gameInfo.avg))).to.equal(ethers.utils.formatEther(gameInfo.pot) / gameInfo.playersSize.toNumber());
     expect(gameInfo.playersSize.toNumber()).to.equal(2);
 
     // Add a new deposit from addr3
     // Send ether to the contract
-    const depositAmountAddr3 = ethers.utils.parseEther('6');
+    const depositAmountAddr3 = ethers.utils.parseEther('6000');
     await addr3.sendTransaction({
         to: depositContract.address,
         value: depositAmountAddr3,
@@ -139,12 +139,12 @@ describe("Main suite", function () {
 
     gameInfo = await depositContract.getGameInfo();
     expect(gameInfo.id.toString()).to.equal('0');
-    expect(ethers.utils.formatEther(gameInfo.pot)).to.equal('18.0');
+    expect(ethers.utils.formatEther(gameInfo.pot)).to.equal('21000.0');
     expect(Number(ethers.utils.formatEther(gameInfo.avg))).to.equal(ethers.utils.formatEther(gameInfo.pot) / gameInfo.playersSize.toNumber());
     expect(gameInfo.playersSize.toNumber()).to.equal(3);
 
     // Add a new deposit from addr4
-    const depositAmountAddr4 = ethers.utils.parseEther('5');
+    const depositAmountAddr4 = ethers.utils.parseEther('3000');
     await addr4.sendTransaction({
         to: depositContract.address,
         value: depositAmountAddr4,
@@ -152,7 +152,7 @@ describe("Main suite", function () {
 
     gameInfo = await depositContract.getGameInfo();
     expect(gameInfo.id.toString()).to.equal('0');
-    expect(ethers.utils.formatEther(gameInfo.pot)).to.equal('23.0');
+    expect(ethers.utils.formatEther(gameInfo.pot)).to.equal('24000.0');
     expect(Number(ethers.utils.formatEther(gameInfo.avg))).to.equal(ethers.utils.formatEther(gameInfo.pot) / gameInfo.playersSize.toNumber());
     expect(gameInfo.playersSize.toNumber()).to.equal(4);
 
