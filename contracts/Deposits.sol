@@ -52,7 +52,7 @@ contract Deposits is ReentrancyGuard {
         currentGame.id = _cgid;
         // We want the game to last between 30 minutes and an hour
         // make a decoy contract to mirror this but with time skipping perms
-        currentGame.timeLimit = 5 seconds;
+        currentGame.timeLimit = 30 seconds;
         currentGame.minDeposit = DEFAULT_MIN_DEPOSIT;
         currentGame.pot = DEFAULT_POT;
         currentGame.avg = DEFAULT_AVG;
@@ -80,7 +80,6 @@ contract Deposits is ReentrancyGuard {
         games[_cgid].players[games[_cgid].playersSize + 1] = Player({
             addr: msg.sender,
             bet: msg.value,
-            winnings: 0,
             timestamp: block.timestamp
         });
         games[_cgid].existingPlayers[msg.sender] = games[_cgid].playersSize + 1;
@@ -155,7 +154,7 @@ contract Deposits is ReentrancyGuard {
         _cgid += 1;
         Game storage currentGame = games[_cgid];
         currentGame.id = _cgid;
-        currentGame.timeLimit = 5 seconds;
+        currentGame.timeLimit = 30 seconds;
         currentGame.minDeposit = DEFAULT_MIN_DEPOSIT;
         currentGame.pot = DEFAULT_POT;
         currentGame.avg = DEFAULT_AVG;
