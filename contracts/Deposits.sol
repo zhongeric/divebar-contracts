@@ -48,7 +48,6 @@ contract Deposits is ReentrancyGuard {
     constructor() payable {
         owner = payable(msg.sender);
         // Create a new game
-        // Game storage currentGame = games[_cgid];
         games[_cgid].id = _cgid;
         // We want the game to last between 30 minutes and an hour
         // make a decoy contract to mirror this but with time skipping perms
@@ -152,7 +151,6 @@ contract Deposits is ReentrancyGuard {
         payoutWinnings();
         // create a new game
         _cgid += 1;
-        // Game storage currentGame = games[_cgid];
         games[_cgid].id = _cgid;
         games[_cgid].timeLimit = 30 seconds;
         games[_cgid].minDeposit = DEFAULT_MIN_DEPOSIT;
