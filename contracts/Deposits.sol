@@ -20,8 +20,7 @@ contract Deposits is ReentrancyGuard {
     struct Player {
         address addr;
         uint256 bet;
-        uint256 winnings;
-        uint256 timestamp; // The timestamp when the user waved.
+        uint256 timestamp;
     }
 
     struct Game {
@@ -30,12 +29,12 @@ contract Deposits is ReentrancyGuard {
         uint256 minDeposit;
         uint256 pot;
         uint256 avg;
-        // array of players
-        mapping(uint256 => Player) players;
-        mapping(address => uint256) existingPlayers;
         uint256 playersSize;
         uint256 createdAt;
         uint256 endingAt;
+        // array of players
+        mapping(uint256 => Player) players;
+        mapping(address => uint256) existingPlayers;
     }
 
     address payable public owner;
