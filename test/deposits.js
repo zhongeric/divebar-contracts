@@ -15,10 +15,12 @@ describe("Main suite", function () {
   it("Compiles, runs, and all functions work", async function () {
     const [owner, addr1, addr2] = await ethers.getSigners();
     const depositContractFactory = await ethers.getContractFactory('Deposits');
+
     const depositContract = await depositContractFactory.deploy({
         value: ethers.utils.parseEther('0.5'),
     });
     await depositContract.deployed();
+    
 
     /*
         * Get Contract balance
@@ -44,6 +46,9 @@ describe("Main suite", function () {
     expect(ethers.utils.formatEther(gameInfo.pot)).to.equal('9000.0');
     expect(Number(ethers.utils.formatEther(gameInfo.avg))).to.equal(ethers.utils.formatEther(gameInfo.pot) / gameInfo.playersSize.toNumber());
     expect(gameInfo.playersSize.toNumber()).to.equal(1);
+    console.log("Time limit ", gameInfo.timeLimit.toNumber());
+    console.log("Created At ", gameInfo.createdAt.toNumber());
+    console.log("Ends At ", gameInfo.endingAt.toNumber());
 
     // Add a new deposit from addr2
     // Send ether to the contract

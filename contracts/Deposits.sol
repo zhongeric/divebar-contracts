@@ -2,8 +2,6 @@
 
 pragma solidity ^0.8.0;
 
-// import "./libraries/IterableMapping.sol";
-
 import "hardhat/console.sol";
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
@@ -50,6 +48,8 @@ contract Deposits is ReentrancyGuard {
         // Create a new game
         Game storage currentGame = games[_cgid];
         currentGame.id = _cgid;
+        // We want the game to last between 30 minutes and an hour
+        // make a decoy contract to mirror this but with time skipping perms
         currentGame.timeLimit = 5 seconds;
         currentGame.minDeposit = DEFAULT_MIN_DEPOSIT;
         currentGame.pot = DEFAULT_POT;
@@ -137,6 +137,7 @@ contract Deposits is ReentrancyGuard {
     function withdraw(uint256 _amount) external {
         require(msg.sender == owner, "caller is not owner");
         payable(msg.sender).transfer(_amount);
+        emit Withdraw(msg.sender, _amount);
     }
 
     function handleGameOver() public payable {
@@ -156,7 +157,7 @@ contract Deposits is ReentrancyGuard {
     }
 
     function payoutWinnings() private {
-        console.log("Paying out winners");
+        console.log("Paying out winners of game", games[_cgid].id);
         // Calculate number of losers
         uint256 numLosers = 0;
         for (uint256 i = 1; i <= games[_cgid].playersSize; i++) {
