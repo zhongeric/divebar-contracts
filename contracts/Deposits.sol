@@ -156,23 +156,50 @@ contract Deposits is ReentrancyGuard {
     }
 
     function payoutWinnings() private {
+        console.log("Paying out winners");
+        // Calculate number of losers
+        uint256 numLosers = 0;
+        for (uint256 i = 1; i <= games[_cgid].playersSize; i++) {
+            // TODO: do you need to bet more than the average or is equal to okay?
+            if (games[_cgid].players[i].bet < games[_cgid].avg) {
+                numLosers += 1;
+            }
+        }
+        uint256 numWinners = games[_cgid].playersSize - numLosers;
+        console.log("numLosers: ", numLosers);
+        console.log("numWinners: ", numWinners);
+        if (numWinners == 0) {
+            console.log("No winners");
+            return;
+        }
+        // Calculate payout per winner
+        uint256 payoutPerWinner = games[_cgid].pot /
+            (games[_cgid].playersSize - numLosers);
+        console.log("payoutPerWinner: ", payoutPerWinner);
+
         // Iterate through players
         for (uint256 i = 1; i <= games[_cgid].playersSize; i++) {
-            // send winnings to player
-
-            sendViaCall(payable(games[_cgid].players[i].addr));
-            // subtract winnings from pot
-            games[_cgid].pot -= msg.value;
-            // emit Payout event
-            emit Payout(games[_cgid].players[i].addr, msg.value);
-            console.log("Payout sent to: ", games[_cgid].players[i].addr);
+            // send payout to player only if bet >= avg
+            if (games[_cgid].players[i].bet >= games[_cgid].avg) {
+                // calculate payout
+                sendViaCall(
+                    payable(games[_cgid].players[i].addr),
+                    payoutPerWinner
+                );
+                // subtract winnings from pot
+                games[_cgid].pot -= payoutPerWinner;
+                // emit Payout event
+                emit Payout(games[_cgid].players[i].addr, msg.value);
+                console.log("Payout sent to: ", games[_cgid].players[i].addr);
+            }
         }
+        console.log("Pot: ", games[_cgid].pot);
     }
 
-    function sendViaCall(address payable _to) internal {
+    function sendViaCall(address payable _to, uint256 payout) internal {
         // Call returns a boolean value indicating success or failure.
         // This is the current recommended method to use.
-        (bool sent, bytes memory data) = _to.call{value: msg.value}("");
+        (bool sent, bytes memory data) = _to.call{value: payout}("");
         require(sent, "Failed to send Ether");
     }
 }
