@@ -63,9 +63,7 @@ const main = async () => {
 
     // game should be over now, call handleGameOver
 
-    await depositContract.handleGameOver({
-        value: ethers.utils.parseEther('4000'),
-    });
+    await depositContract.handleGameOver();
     console.log('Game over');
 
     // Verify new game has been created

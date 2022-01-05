@@ -16,10 +16,56 @@ contract DiveBar is ReentrancyGuard {
     uint256 public constant DEFAULT_POT = 0 ether;
     uint256 public constant DEFAULT_AVG = 0 ether;
     uint256 public constant DEFAULT_PLAYERS_SIZE = 0;
+    uint256 private BIG_FACTOR = 1000000;
+
+    function intToFixed(uint256 x) internal pure returns (uint256 y) {
+        y = x * 10**18;
+    }
+
+    function mulFixed(uint256 x, uint256 y) internal pure returns (uint256 z) {
+        uint256 a = x / 10**18;
+        uint256 b = x % 10**18;
+        uint256 c = y / 10**18;
+        uint256 d = y % 10**18;
+        return a * c * 10**18 + a * d + b * c + (b * d) / 10**18;
+    }
+
+    function divFixedInt(uint256 x, uint256 y)
+        internal
+        pure
+        returns (uint256 z)
+    {
+        z = x / y;
+    }
+
+    function divFixedIntNegative(int256 x, int256 y)
+        internal
+        pure
+        returns (int256 z)
+    {
+        z = x / y;
+    }
+
+    function addFixedNegative(int256 x, int256 y)
+        internal
+        pure
+        returns (int256 z)
+    {
+        z = x + y;
+    }
+
+    function addFixed(uint256 x, uint256 y) internal pure returns (uint256 z) {
+        z = x + y;
+    }
+
+    function fixedToInt(uint256 x) internal pure returns (uint256 y) {
+        y = x / 10**18;
+    }
 
     struct Player {
         address addr;
         uint256 bet;
+        uint256 absWeight; // relative weight of this player against other winners, undefined until game over
         uint256 timestamp;
     }
 
@@ -52,7 +98,7 @@ contract DiveBar is ReentrancyGuard {
         games[_cgid].id = _cgid;
         // We want the game to last between 30 minutes and an hour
         // make a decoy contract to mirror this but with time skipping perms
-        games[_cgid].timeLimit = 30 seconds;
+        games[_cgid].timeLimit = 5 seconds;
         games[_cgid].minDeposit = DEFAULT_MIN_DEPOSIT;
         games[_cgid].pot = DEFAULT_POT;
         games[_cgid].avg = DEFAULT_AVG;
@@ -80,6 +126,7 @@ contract DiveBar is ReentrancyGuard {
         games[_cgid].players[games[_cgid].playersSize + 1] = Player({
             addr: msg.sender,
             bet: msg.value,
+            absWeight: 0,
             timestamp: block.timestamp
         });
         games[_cgid].existingPlayers[msg.sender] = games[_cgid].playersSize + 1;
@@ -149,6 +196,46 @@ contract DiveBar is ReentrancyGuard {
         return;
     }
 
+    function normalizedTimePenaltyCurve(uint256 idx)
+        internal
+        pure
+        returns (uint256)
+    {
+        require(idx >= 0 && idx <= 10**18, "Index out of bounds");
+        uint256 temp = mulFixed(idx, idx);
+        temp = mulFixed(temp, idx);
+        temp = uint256(
+            addFixedNegative(
+                int256(intToFixed(1)),
+                divFixedIntNegative(int256(temp), -1)
+            )
+        );
+        // if (temp == 0) {
+        //     return 0.1 * 10**18;
+        // }
+        return temp;
+    }
+
+    function calculatePlayerAbsWeight(uint256 playerIdx)
+        internal
+        returns (uint256)
+    {
+        require(
+            playerIdx >= 1 && playerIdx <= games[_cgid].playersSize,
+            "Player index out of bounds"
+        );
+        // Since we don't have floats
+        uint256 relativeIndex = divFixedInt(
+            intToFixed(playerIdx),
+            games[_cgid].playersSize
+        );
+        console.log("relativeIndex: ", relativeIndex);
+        uint256 absWeight = normalizedTimePenaltyCurve(relativeIndex);
+        console.log("absWeight: ", absWeight);
+        games[_cgid].players[playerIdx].absWeight = absWeight;
+        return absWeight;
+    }
+
     function handleGameOver() external {
         require(secondsRemaining() == 0, "Game is not over yet");
         payoutWinnings();
@@ -156,7 +243,7 @@ contract DiveBar is ReentrancyGuard {
         _cgid += 1;
         // Game storage currentGame = games[_cgid];
         games[_cgid].id = _cgid;
-        games[_cgid].timeLimit = 30 seconds;
+        games[_cgid].timeLimit = 5 seconds;
         games[_cgid].minDeposit = DEFAULT_MIN_DEPOSIT;
         games[_cgid].pot = DEFAULT_POT;
         games[_cgid].avg = DEFAULT_AVG;
@@ -170,34 +257,66 @@ contract DiveBar is ReentrancyGuard {
         console.log("Paying out winners of game", games[_cgid].id);
         // Calculate number of losers
         uint256 numLosers = 0;
+        uint256 numWinners = 0;
+        uint256 winnersAbsWeightSum = 0;
+        uint256 losersPot = 0;
         for (uint256 i = 1; i <= games[_cgid].playersSize; i++) {
             // TODO: do you need to bet more than the average or is equal to okay?
             if (games[_cgid].players[i].bet < games[_cgid].avg) {
                 numLosers += 1;
+                losersPot += games[_cgid].players[i].bet;
+            } else {
+                winnersAbsWeightSum += calculatePlayerAbsWeight(i);
             }
         }
         console.log("numLosers: ", numLosers);
-        console.log("numWinners: ", games[_cgid].playersSize - numLosers);
-        if (games[_cgid].playersSize - numLosers == 0) {
+        console.log("losersPot: ", losersPot);
+
+        numWinners = games[_cgid].playersSize - numLosers;
+        console.log("numWinners: ", numWinners);
+        if (numWinners == 0) {
             console.log("No winners");
             return;
         }
-        // Calculate payout per winner
-        // TODO: remove this and put operation inline to save on gas?
-        uint256 payoutPerWinner = games[_cgid].pot /
-            (games[_cgid].playersSize - numLosers);
-        console.log("payoutPerWinner: ", payoutPerWinner);
 
-        // Iterate through players
         for (uint256 i = 1; i <= games[_cgid].playersSize; i++) {
-            // send payout to player only if bet >= avg
             if (games[_cgid].players[i].bet >= games[_cgid].avg) {
+                console.log("------------ Winner Player ", i, " ------------");
+                // Calculate the payout, which is the player's bet * the weighted winnings
+                uint256 payout = addFixed(
+                    games[_cgid].players[i].bet,
+                    divFixedInt(
+                        intToFixed(
+                            mulFixed(
+                                losersPot,
+                                games[_cgid].players[i].absWeight
+                            )
+                        ),
+                        winnersAbsWeightSum
+                    )
+                );
+                console.log("bet: ", games[_cgid].players[i].bet);
+                console.log("absWeight: ", games[_cgid].players[i].absWeight);
+                console.log("winnersAbsWeightSum: ", winnersAbsWeightSum);
+                console.log(
+                    "winnings from loser pot: ",
+                    divFixedInt(
+                        intToFixed(
+                            mulFixed(
+                                losersPot,
+                                games[_cgid].players[i].absWeight
+                            )
+                        ),
+                        winnersAbsWeightSum
+                    )
+                );
+                console.log("payout: ", payout);
                 // Update player's balance
-                balances[games[_cgid].players[i].addr] += payoutPerWinner;
+                balances[games[_cgid].players[i].addr] += payout;
                 // subtract payout from pot
-                games[_cgid].pot -= payoutPerWinner;
+                games[_cgid].pot -= payout;
                 // emit Payout event
-                emit Payout(games[_cgid].players[i].addr, payoutPerWinner);
+                emit Payout(games[_cgid].players[i].addr, payout);
                 console.log("Payout sent to: ", games[_cgid].players[i].addr);
             }
         }
@@ -209,8 +328,10 @@ contract DiveBar is ReentrancyGuard {
             console.log("Remaining pot swept to: ", owner);
         }
 
-        delete payoutPerWinner;
         delete numLosers;
+        delete numWinners;
+        delete winnersAbsWeightSum;
+        delete losersPot;
         return;
     }
 
