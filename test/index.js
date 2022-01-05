@@ -14,7 +14,7 @@ describe("Main suite", function () {
 
   it("Compiles, runs, and all functions work", async function () {
     const [owner, addr1, addr2] = await ethers.getSigners();
-    const depositContractFactory = await ethers.getContractFactory('Deposits');
+    const depositContractFactory = await ethers.getContractFactory('DiveBar');
 
     const depositContract = await depositContractFactory.deploy({
         value: ethers.utils.parseEther('0.5'),
@@ -87,7 +87,7 @@ describe("Main suite", function () {
 
   it("Can handle games with losers and winners", async function () {
     const [owner, addr1, addr2, addr3] = await ethers.getSigners();
-    const depositContractFactory = await ethers.getContractFactory('Deposits');
+    const depositContractFactory = await ethers.getContractFactory('DiveBar');
     const depositContract = await depositContractFactory.deploy({
         value: ethers.utils.parseEther('0.5'),
     });
@@ -175,7 +175,7 @@ describe("Main suite", function () {
 
   it("Should not be able to payout and create new game before current is over", async function () {
     const [owner, addr1, addr2] = await ethers.getSigners();
-    const depositContractFactory = await ethers.getContractFactory('Deposits');
+    const depositContractFactory = await ethers.getContractFactory('DiveBar');
     const depositContract = await depositContractFactory.deploy({
         value: ethers.utils.parseEther('0.5'),
     });

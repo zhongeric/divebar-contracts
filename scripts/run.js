@@ -8,7 +8,7 @@ function sleep(ms) {
 
 const main = async () => {
     const [owner, addr1, addr2] = await ethers.getSigners();
-    const depositContractFactory = await ethers.getContractFactory('Deposits');
+    const depositContractFactory = await ethers.getContractFactory('DiveBar');
     const depositContract = await depositContractFactory.deploy({
         value: ethers.utils.parseEther('0.5'),
     });

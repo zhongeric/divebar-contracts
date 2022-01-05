@@ -8,7 +8,7 @@ import "hardhat/console.sol";
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 
-contract Deposits is ReentrancyGuard {
+contract DiveBar is ReentrancyGuard {
     using SafeMath for uint256;
 
     uint256 private _cgid = 0;
@@ -139,12 +139,14 @@ contract Deposits is ReentrancyGuard {
         require(msg.sender == owner, "caller is not owner");
         payable(msg.sender).transfer(_amount);
         emit Withdraw(msg.sender, _amount);
+        return;
     }
 
     // TODO: add custom amount feature
     function getPayout() external payable {
         require(balances[msg.sender] > 0, "You have no winnings");
         sendViaCall(payable(msg.sender), balances[msg.sender]);
+        return;
     }
 
     function handleGameOver() external {
@@ -161,6 +163,7 @@ contract Deposits is ReentrancyGuard {
         games[_cgid].playersSize = DEFAULT_PLAYERS_SIZE;
         games[_cgid].createdAt = block.timestamp;
         games[_cgid].endingAt = block.timestamp + games[_cgid].timeLimit;
+        return;
     }
 
     function payoutWinnings() internal {
@@ -185,13 +188,14 @@ contract Deposits is ReentrancyGuard {
             (games[_cgid].playersSize - numLosers);
         console.log("payoutPerWinner: ", payoutPerWinner);
 
-        games[_cgid].pot = 0;
         // Iterate through players
         for (uint256 i = 1; i <= games[_cgid].playersSize; i++) {
             // send payout to player only if bet >= avg
             if (games[_cgid].players[i].bet >= games[_cgid].avg) {
                 // Update player's balance
                 balances[games[_cgid].players[i].addr] += payoutPerWinner;
+                // subtract payout from pot
+                games[_cgid].pot -= payoutPerWinner;
                 // emit Payout event
                 emit Payout(games[_cgid].players[i].addr, payoutPerWinner);
                 console.log("Payout sent to: ", games[_cgid].players[i].addr);
@@ -207,6 +211,7 @@ contract Deposits is ReentrancyGuard {
 
         delete payoutPerWinner;
         delete numLosers;
+        return;
     }
 
     function sendViaCall(address payable _to, uint256 payout) internal {
@@ -214,5 +219,6 @@ contract Deposits is ReentrancyGuard {
         // This is the current recommended method to use.
         (bool sent, bytes memory data) = _to.call{value: payout}("");
         require(sent, "Failed to send Ether");
+        return;
     }
 }
