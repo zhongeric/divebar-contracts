@@ -48,17 +48,17 @@ contract Deposits is ReentrancyGuard {
     constructor() payable {
         owner = payable(msg.sender);
         // Create a new game
-        Game storage currentGame = games[_cgid];
-        currentGame.id = _cgid;
+        // Game storage currentGame = games[_cgid];
+        games[_cgid].id = _cgid;
         // We want the game to last between 30 minutes and an hour
         // make a decoy contract to mirror this but with time skipping perms
-        currentGame.timeLimit = 30 seconds;
-        currentGame.minDeposit = DEFAULT_MIN_DEPOSIT;
-        currentGame.pot = DEFAULT_POT;
-        currentGame.avg = DEFAULT_AVG;
-        currentGame.playersSize = DEFAULT_PLAYERS_SIZE;
-        currentGame.createdAt = block.timestamp;
-        currentGame.endingAt = block.timestamp + currentGame.timeLimit;
+        games[_cgid].timeLimit = 30 seconds;
+        games[_cgid].minDeposit = DEFAULT_MIN_DEPOSIT;
+        games[_cgid].pot = DEFAULT_POT;
+        games[_cgid].avg = DEFAULT_AVG;
+        games[_cgid].playersSize = DEFAULT_PLAYERS_SIZE;
+        games[_cgid].createdAt = block.timestamp;
+        games[_cgid].endingAt = block.timestamp + games[_cgid].timeLimit;
     }
 
     // Function to receive Ether. msg.data must be empty
@@ -152,15 +152,15 @@ contract Deposits is ReentrancyGuard {
         payoutWinnings();
         // create a new game
         _cgid += 1;
-        Game storage currentGame = games[_cgid];
-        currentGame.id = _cgid;
-        currentGame.timeLimit = 30 seconds;
-        currentGame.minDeposit = DEFAULT_MIN_DEPOSIT;
-        currentGame.pot = DEFAULT_POT;
-        currentGame.avg = DEFAULT_AVG;
-        currentGame.playersSize = DEFAULT_PLAYERS_SIZE;
-        currentGame.createdAt = block.timestamp;
-        currentGame.endingAt = block.timestamp + currentGame.timeLimit;
+        // Game storage currentGame = games[_cgid];
+        games[_cgid].id = _cgid;
+        games[_cgid].timeLimit = 30 seconds;
+        games[_cgid].minDeposit = DEFAULT_MIN_DEPOSIT;
+        games[_cgid].pot = DEFAULT_POT;
+        games[_cgid].avg = DEFAULT_AVG;
+        games[_cgid].playersSize = DEFAULT_PLAYERS_SIZE;
+        games[_cgid].createdAt = block.timestamp;
+        games[_cgid].endingAt = block.timestamp + games[_cgid].timeLimit;
     }
 
     function payoutWinnings() internal {
