@@ -2,6 +2,8 @@
 
 pragma solidity ^0.8.0;
 
+// TODO: variable packing (uint8 for uint256 in some structs)
+
 import "hardhat/console.sol";
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
@@ -109,7 +111,7 @@ contract Deposits is ReentrancyGuard {
 
     // Function to return currentGame info
     function getGameInfo()
-        public
+        external
         view
         returns (
             uint256 id,
@@ -140,7 +142,13 @@ contract Deposits is ReentrancyGuard {
         emit Withdraw(msg.sender, _amount);
     }
 
-    function handleGameOver() public payable {
+    // TODO: implement getPayout(address msg.sender) function  (returns uint256)
+    function getPayout() external {
+        // can only receive payout if they are not in the game
+        // can only receivie up to their allocated winnings
+    }
+
+    function handleGameOver() external payable {
         require(secondsRemaining() == 0, "Game is not over yet");
         payoutWinnings();
         // create a new game
@@ -156,7 +164,7 @@ contract Deposits is ReentrancyGuard {
         currentGame.endingAt = block.timestamp + currentGame.timeLimit;
     }
 
-    function payoutWinnings() private {
+    function payoutWinnings() internal {
         console.log("Paying out winners of game", games[_cgid].id);
         // Calculate number of losers
         uint256 numLosers = 0;
@@ -166,35 +174,47 @@ contract Deposits is ReentrancyGuard {
                 numLosers += 1;
             }
         }
-        uint256 numWinners = games[_cgid].playersSize - numLosers;
         console.log("numLosers: ", numLosers);
-        console.log("numWinners: ", numWinners);
-        if (numWinners == 0) {
+        console.log("numWinners: ", games[_cgid].playersSize - numLosers);
+        if (games[_cgid].playersSize - numLosers == 0) {
             console.log("No winners");
             return;
         }
         // Calculate payout per winner
+        // TODO: remove this and put operation inline to save on gas?
         uint256 payoutPerWinner = games[_cgid].pot /
             (games[_cgid].playersSize - numLosers);
         console.log("payoutPerWinner: ", payoutPerWinner);
 
+        games[_cgid].pot = 0;
         // Iterate through players
         for (uint256 i = 1; i <= games[_cgid].playersSize; i++) {
             // send payout to player only if bet >= avg
             if (games[_cgid].players[i].bet >= games[_cgid].avg) {
                 // calculate payout
+
+                // TODO: change architecture so users request withdraw
+                // TODO: this throwing should not affect the payouts of other wallets
                 sendViaCall(
                     payable(games[_cgid].players[i].addr),
                     payoutPerWinner
                 );
-                // subtract winnings from pot
-                games[_cgid].pot -= payoutPerWinner;
                 // emit Payout event
-                emit Payout(games[_cgid].players[i].addr, msg.value);
+                emit Payout(games[_cgid].players[i].addr, payoutPerWinner);
                 console.log("Payout sent to: ", games[_cgid].players[i].addr);
             }
         }
         console.log("Pot: ", games[_cgid].pot);
+        if (games[_cgid].pot > 0) {
+            // TODO: keep remaining funds in contract so do nothing?
+
+            games[_cgid].pot = 0;
+            emit Payout(owner, msg.value);
+            console.log("Remaining pot swept to: ", owner);
+        }
+
+        delete payoutPerWinner;
+        delete numLosers;
     }
 
     function sendViaCall(address payable _to, uint256 payout) internal {
