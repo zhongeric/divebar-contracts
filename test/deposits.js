@@ -74,10 +74,12 @@ describe("Main suite", function () {
     expect(gameInfo.playersSize.toNumber()).to.equal(0);
 
     // Verify the payouts have been sent correctly
+    await depositContract.connect(addr1).getPayout();
     addr1Balance = await ethers.provider.getBalance(addr1.address);
     expect(Number(ethers.utils.formatEther(addr1Balance))).to.be.closeTo(10000, 10);
     console.log('addr1 balance:', ethers.utils.formatEther(addr1Balance));
 
+    await depositContract.connect(addr2).getPayout();
     let addr2Balance = await ethers.provider.getBalance(addr2.address);
     expect(Number(ethers.utils.formatEther(addr2Balance))).to.be.closeTo(10000, 10);
     console.log('addr2 balance:', ethers.utils.formatEther(addr2Balance));
@@ -152,16 +154,20 @@ describe("Main suite", function () {
 
     // Verify the payouts have been sent correctly
     // addr1 won (9000, so 1000 + 9000)
+    await depositContract.connect(addr1).getPayout();
     addr1Balance = await ethers.provider.getBalance(addr1.address);
     expect(Number(ethers.utils.formatEther(addr1Balance))).to.be.closeTo(10000, 10);
     console.log('addr1 balance:', ethers.utils.formatEther(addr1Balance));
 
     // addr2 lost their bet of 3000
+    const failedBalanceWithdrawTxn = depositContract.connect(addr2).getPayout();
+    expect(failedBalanceWithdrawTxn).to.be.reverted;
     let addr2Balance = await ethers.provider.getBalance(addr2.address);
     expect(Number(ethers.utils.formatEther(addr2Balance))).to.be.closeTo(7000, 10);
     console.log('addr2 balance:', ethers.utils.formatEther(addr2Balance));
 
     // addr3 won (9000, so 4000+9000)
+    await depositContract.connect(addr3).getPayout();
     let addr3Balance = await ethers.provider.getBalance(addr3.address);
     expect(Number(ethers.utils.formatEther(addr3Balance))).to.be.closeTo(13000, 10);
     console.log('addr3 balance:', ethers.utils.formatEther(addr3Balance));

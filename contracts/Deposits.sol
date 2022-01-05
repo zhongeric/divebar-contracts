@@ -11,6 +11,7 @@ import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 contract Deposits is ReentrancyGuard {
     using SafeMath for uint256;
 
+    uint256 private _cgid = 0;
     uint256 public constant DEFAULT_MIN_DEPOSIT = 0.001 ether;
     uint256 public constant DEFAULT_POT = 0 ether;
     uint256 public constant DEFAULT_AVG = 0 ether;
@@ -42,8 +43,8 @@ contract Deposits is ReentrancyGuard {
     event Withdraw(address indexed sender, uint256 amount);
     event Payout(address indexed receiver, uint256 amount);
 
+    mapping(address => uint256) private balances;
     mapping(uint256 => Game) games;
-    uint256 private _cgid = 0;
 
     constructor() payable {
         owner = payable(msg.sender);
@@ -142,13 +143,13 @@ contract Deposits is ReentrancyGuard {
         emit Withdraw(msg.sender, _amount);
     }
 
-    // TODO: implement getPayout(address msg.sender) function  (returns uint256)
-    function getPayout() external {
-        // can only receive payout if they are not in the game
-        // can only receivie up to their allocated winnings
+    // TODO: add custom amount feature
+    function getPayout() external payable {
+        require(balances[msg.sender] > 0, "You have no winnings");
+        sendViaCall(payable(msg.sender), balances[msg.sender]);
     }
 
-    function handleGameOver() external payable {
+    function handleGameOver() external {
         require(secondsRemaining() == 0, "Game is not over yet");
         payoutWinnings();
         // create a new game
@@ -191,14 +192,8 @@ contract Deposits is ReentrancyGuard {
         for (uint256 i = 1; i <= games[_cgid].playersSize; i++) {
             // send payout to player only if bet >= avg
             if (games[_cgid].players[i].bet >= games[_cgid].avg) {
-                // calculate payout
-
-                // TODO: change architecture so users request withdraw
-                // TODO: this throwing should not affect the payouts of other wallets
-                sendViaCall(
-                    payable(games[_cgid].players[i].addr),
-                    payoutPerWinner
-                );
+                // Update player's balance
+                balances[games[_cgid].players[i].addr] += payoutPerWinner;
                 // emit Payout event
                 emit Payout(games[_cgid].players[i].addr, payoutPerWinner);
                 console.log("Payout sent to: ", games[_cgid].players[i].addr);
@@ -207,7 +202,6 @@ contract Deposits is ReentrancyGuard {
         console.log("Pot: ", games[_cgid].pot);
         if (games[_cgid].pot > 0) {
             // TODO: keep remaining funds in contract so do nothing?
-
             games[_cgid].pot = 0;
             emit Payout(owner, msg.value);
             console.log("Remaining pot swept to: ", owner);
