@@ -261,13 +261,16 @@ contract DiveBar is ReentrancyGuard {
 
                 uint256 additionalWinnings = FixidityLib.unwrap(
                     FixidityLib.multiply(
-                        FixidityLib.wrap(losersPot),
-                        FixidityLib.newFixedFraction(
-                            FixidityLib.unwrap(
-                                games[_cgid].players[i].curveWeight
-                            ),
-                            FixidityLib.unwrap(winnersAbsWeightSum)
-                        )
+                        FixidityLib.multiply(
+                            FixidityLib.wrap(losersPot),
+                            FixidityLib.newFixedFraction(
+                                FixidityLib.unwrap(
+                                    games[_cgid].players[i].curveWeight
+                                ),
+                                FixidityLib.unwrap(winnersAbsWeightSum)
+                            )
+                        ),
+                        FixidityLib.newFixedFraction(99, 100) // Platform fee of 1%
                     )
                 );
 
