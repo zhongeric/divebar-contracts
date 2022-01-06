@@ -270,6 +270,7 @@ contract DiveBar is ReentrancyGuard {
                                 FixidityLib.unwrap(winnersAbsWeightSum)
                             )
                         ),
+                        // TODO: platform fee should be taken out either the total pot or every payout, i think they are equivalent though
                         FixidityLib.newFixedFraction(99, 100) // Platform fee of 1%
                     )
                 );
