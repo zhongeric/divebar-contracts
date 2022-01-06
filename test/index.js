@@ -110,6 +110,35 @@ describe("Main suite", function () {
     expect(Number(ethers.utils.formatEther(addr2Balance))).to.be.closeTo(10000, 10);
     console.log('addr2 balance:', ethers.utils.formatEther(addr2Balance));
   });
+  it('Correctly handles games with only one player', async function () {
+    const [owner, addr1] = await ethers.getSigners();
+    const [depositContract] = await setUpGame({
+        numPlayers: 1,
+        timeLimit: 5000,
+        players: [
+            {
+                id: 1,
+                signer: addr1,
+                bet: '9000',
+            }
+        ]
+    });
+    
+    await sleep(DEFAULT_GAME_TIME);
+
+    await depositContract.handleGameOver();
+
+    gameInfo = await depositContract.getGameInfo();
+    expect(gameInfo.id.toString()).to.equal('1');
+    expect(ethers.utils.formatEther(gameInfo.pot)).to.equal('0.0');
+    expect(gameInfo.playersSize.toNumber()).to.equal(0);
+    // Verify the payouts have been sent correctly
+    // addr1 wins, regains bet of 9000 + % of winners pot of 0
+    await depositContract.connect(addr1).getPayout();
+    addr1Balance = await ethers.provider.getBalance(addr1.address);
+    expect(Number(ethers.utils.formatEther(addr1Balance))).to.be.closeTo(10000, 10);
+    console.log('addr1 balance:', ethers.utils.formatEther(addr1Balance));
+  })
 
   it("Can handle games with losers and winners", async function () {
     const [owner, addr1, addr2, addr3, addr4] = await ethers.getSigners();

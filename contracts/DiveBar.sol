@@ -258,22 +258,24 @@ contract DiveBar is ReentrancyGuard {
         for (uint256 i = 1; i <= games[_cgid].playersSize; i++) {
             if (games[_cgid].players[i].bet >= games[_cgid].avg) {
                 console.log("------------ Winner Player ", i, " ------------");
-
-                uint256 additionalWinnings = FixidityLib.unwrap(
-                    FixidityLib.multiply(
+                uint256 additionalWinnings = 0;
+                if (losersPot != 0) {
+                    additionalWinnings = FixidityLib.unwrap(
                         FixidityLib.multiply(
-                            FixidityLib.wrap(losersPot),
-                            FixidityLib.newFixedFraction(
-                                FixidityLib.unwrap(
-                                    games[_cgid].players[i].curveWeight
-                                ),
-                                FixidityLib.unwrap(winnersAbsWeightSum)
-                            )
-                        ),
-                        // TODO: platform fee should be taken out either the total pot or every payout, i think they are equivalent though
-                        FixidityLib.newFixedFraction(99, 100) // Platform fee of 1%
-                    )
-                );
+                            FixidityLib.multiply(
+                                FixidityLib.wrap(losersPot),
+                                FixidityLib.newFixedFraction(
+                                    FixidityLib.unwrap(
+                                        games[_cgid].players[i].curveWeight
+                                    ),
+                                    FixidityLib.unwrap(winnersAbsWeightSum)
+                                )
+                            ),
+                            // TODO: platform fee should be taken out either the total pot or every payout, i think they are equivalent though
+                            FixidityLib.newFixedFraction(99, 100) // Platform fee of 1%
+                        )
+                    );
+                }
 
                 uint256 payout = games[_cgid].players[i].bet +
                     additionalWinnings;
