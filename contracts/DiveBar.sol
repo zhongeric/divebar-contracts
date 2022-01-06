@@ -9,10 +9,12 @@ import "./libraries/FixidityLib.sol";
 import "hardhat/console.sol";
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/utils/math/SignedSafeMath.sol";
 
 contract DiveBar is ReentrancyGuard {
     using FixidityLib for *;
     using SafeMath for uint256;
+    using SignedSafeMath for int256;
 
     uint256 private _cgid = 0;
     uint256 public constant DEFAULT_MIN_DEPOSIT = 0.001 ether;
@@ -21,55 +23,11 @@ contract DiveBar is ReentrancyGuard {
     uint256 public constant DEFAULT_PLAYERS_SIZE = 0;
     uint256 private BIG_FACTOR = 1000000;
 
-    function intToFixed(uint256 x) internal pure returns (uint256 y) {
-        y = x * 10**18;
-    }
-
-    function mulFixed(uint256 x, uint256 y) internal pure returns (uint256 z) {
-        uint256 a = x / 10**18;
-        uint256 b = x % 10**18;
-        uint256 c = y / 10**18;
-        uint256 d = y % 10**18;
-        return a * c * 10**18 + a * d + b * c + (b * d) / 10**18;
-    }
-
-    function divFixedInt(uint256 x, uint256 y)
-        internal
-        pure
-        returns (uint256 z)
-    {
-        z = x / y;
-    }
-
-    function divFixedIntNegative(int256 x, int256 y)
-        internal
-        pure
-        returns (int256 z)
-    {
-        z = x / y;
-    }
-
-    function addFixedNegative(int256 x, int256 y)
-        internal
-        pure
-        returns (int256 z)
-    {
-        z = x + y;
-    }
-
-    function addFixed(uint256 x, uint256 y) internal pure returns (uint256 z) {
-        z = x + y;
-    }
-
-    function fixedToInt(uint256 x) internal pure returns (uint256 y) {
-        y = x / 10**18;
-    }
-
     struct Player {
         address addr;
         uint256 bet;
-        uint256 absWeight; // relative weight of this player against other winners, undefined until game over
         uint256 timestamp;
+        FixidityLib.Fraction curveWeight; // relative weight of this player against other winners, undefined until game over
     }
 
     struct Game {
@@ -101,7 +59,7 @@ contract DiveBar is ReentrancyGuard {
         games[_cgid].id = _cgid;
         // We want the game to last between 30 minutes and an hour
         // make a decoy contract to mirror this but with time skipping perms
-        games[_cgid].timeLimit = 5 seconds;
+        games[_cgid].timeLimit = 5 minutes;
         games[_cgid].minDeposit = DEFAULT_MIN_DEPOSIT;
         games[_cgid].pot = DEFAULT_POT;
         games[_cgid].avg = DEFAULT_AVG;
@@ -129,7 +87,7 @@ contract DiveBar is ReentrancyGuard {
         games[_cgid].players[games[_cgid].playersSize + 1] = Player({
             addr: msg.sender,
             bet: msg.value,
-            absWeight: 0,
+            curveWeight: FixidityLib.newFixed(0),
             timestamp: block.timestamp
         });
         games[_cgid].existingPlayers[msg.sender] = games[_cgid].playersSize + 1;
@@ -199,44 +157,54 @@ contract DiveBar is ReentrancyGuard {
         return;
     }
 
-    function normalizedTimePenaltyCurve(uint256 idx)
+    function normalizedTimePenaltyCurve(FixidityLib.Fraction memory idx)
         internal
         pure
-        returns (uint256)
+        returns (FixidityLib.Fraction memory)
     {
-        require(idx >= 0 && idx <= 10**18, "Index out of bounds");
-        uint256 temp = mulFixed(idx, idx);
-        temp = mulFixed(temp, idx);
-        temp = uint256(
-            addFixedNegative(
-                int256(intToFixed(1)),
-                divFixedIntNegative(int256(temp), -1)
-            )
+        require(
+            idx.value >= 0 && FixidityLib.lte(idx, FixidityLib.fixed1()),
+            "Index out of bounds"
         );
-        // if (temp == 0) {
-        //     return 0.1 * 10**18;
-        // }
-        return temp;
+
+        FixidityLib.Fraction memory temp = FixidityLib.multiply(
+            FixidityLib.multiply(idx, idx),
+            idx
+        );
+
+        return FixidityLib.subtract(FixidityLib.fixed1(), temp);
     }
 
     function calculatePlayerAbsWeight(uint256 playerIdx)
         internal
-        returns (uint256)
+        returns (FixidityLib.Fraction memory)
     {
         require(
             playerIdx >= 1 && playerIdx <= games[_cgid].playersSize,
             "Player index out of bounds"
         );
-        // Since we don't have floats
-        uint256 relativeIndex = divFixedInt(
-            intToFixed(playerIdx),
-            games[_cgid].playersSize
-        );
-        console.log("relativeIndex: ", relativeIndex);
-        uint256 absWeight = normalizedTimePenaltyCurve(relativeIndex);
-        console.log("absWeight: ", absWeight);
-        games[_cgid].players[playerIdx].absWeight = absWeight;
-        return absWeight;
+        FixidityLib.Fraction memory fixedPlayerRelativeIdx = FixidityLib
+            .newFixedFraction(playerIdx, games[_cgid].playersSize);
+        // console.log(
+        //     "fixedPlayerRelativeIdx: ",
+        //     FixidityLib.integer(fixedPlayerRelativeIdx).value,
+        //     ".",
+        //     FixidityLib.fractional(fixedPlayerRelativeIdx).value
+        // );
+        FixidityLib.Fraction
+            memory fixedPlayerRelativeCurveWeight = normalizedTimePenaltyCurve(
+                fixedPlayerRelativeIdx
+            );
+        // console.log(
+        //     "fixedPlayerRelativeCurveWeight: ",
+        //     FixidityLib.integer(fixedPlayerRelativeCurveWeight).value,
+        //     ".",
+        //     FixidityLib.fractional(fixedPlayerRelativeCurveWeight).value
+        // );
+        games[_cgid]
+            .players[playerIdx]
+            .curveWeight = fixedPlayerRelativeCurveWeight;
+        return fixedPlayerRelativeCurveWeight;
     }
 
     function handleGameOver() external {
@@ -246,7 +214,7 @@ contract DiveBar is ReentrancyGuard {
         _cgid += 1;
         // Game storage currentGame = games[_cgid];
         games[_cgid].id = _cgid;
-        games[_cgid].timeLimit = 5 seconds;
+        games[_cgid].timeLimit = 5 minutes;
         games[_cgid].minDeposit = DEFAULT_MIN_DEPOSIT;
         games[_cgid].pot = DEFAULT_POT;
         games[_cgid].avg = DEFAULT_AVG;
@@ -261,7 +229,9 @@ contract DiveBar is ReentrancyGuard {
         // Calculate number of losers
         uint256 numLosers = 0;
         uint256 numWinners = 0;
-        uint256 winnersAbsWeightSum = 0;
+        FixidityLib.Fraction memory winnersAbsWeightSum = FixidityLib.newFixed(
+            0
+        );
         uint256 losersPot = 0;
         for (uint256 i = 1; i <= games[_cgid].playersSize; i++) {
             // TODO: do you need to bet more than the average or is equal to okay?
@@ -269,7 +239,10 @@ contract DiveBar is ReentrancyGuard {
                 numLosers += 1;
                 losersPot += games[_cgid].players[i].bet;
             } else {
-                winnersAbsWeightSum += calculatePlayerAbsWeight(i);
+                winnersAbsWeightSum = FixidityLib.add(
+                    winnersAbsWeightSum,
+                    calculatePlayerAbsWeight(i)
+                );
             }
         }
         console.log("numLosers: ", numLosers);
@@ -285,34 +258,38 @@ contract DiveBar is ReentrancyGuard {
         for (uint256 i = 1; i <= games[_cgid].playersSize; i++) {
             if (games[_cgid].players[i].bet >= games[_cgid].avg) {
                 console.log("------------ Winner Player ", i, " ------------");
-                // Calculate the payout, which is the player's bet * the weighted winnings
-                uint256 payout = addFixed(
-                    games[_cgid].players[i].bet,
-                    divFixedInt(
-                        intToFixed(
-                            mulFixed(
-                                losersPot,
-                                games[_cgid].players[i].absWeight
-                            )
-                        ),
-                        winnersAbsWeightSum
-                    )
-                );
+                uint256 additionalWinnings = 0;
+                if (losersPot != 0) {
+                    additionalWinnings = FixidityLib.unwrap(
+                        FixidityLib.multiply(
+                            FixidityLib.multiply(
+                                FixidityLib.wrap(losersPot),
+                                FixidityLib.newFixedFraction(
+                                    FixidityLib.unwrap(
+                                        games[_cgid].players[i].curveWeight
+                                    ),
+                                    FixidityLib.unwrap(winnersAbsWeightSum)
+                                )
+                            ),
+                            // TODO: platform fee should be taken out either the total pot or every payout, i think they are equivalent though
+                            FixidityLib.newFixedFraction(99, 100) // Platform fee of 1%
+                        )
+                    );
+                }
+
+                uint256 payout = games[_cgid].players[i].bet +
+                    additionalWinnings;
+
                 console.log("bet: ", games[_cgid].players[i].bet);
-                console.log("absWeight: ", games[_cgid].players[i].absWeight);
-                console.log("winnersAbsWeightSum: ", winnersAbsWeightSum);
                 console.log(
-                    "winnings from loser pot: ",
-                    divFixedInt(
-                        intToFixed(
-                            mulFixed(
-                                losersPot,
-                                games[_cgid].players[i].absWeight
-                            )
-                        ),
-                        winnersAbsWeightSum
-                    )
+                    "curveWeight: ",
+                    games[_cgid].players[i].curveWeight.value
                 );
+                console.log(
+                    "winnersTotalCurveWeightSum: ",
+                    winnersAbsWeightSum.value
+                );
+                console.log("winnings from loser pot: ", additionalWinnings);
                 console.log("payout: ", payout);
                 // Update player's balance
                 balances[games[_cgid].players[i].addr] += payout;
