@@ -2,6 +2,8 @@
 
 pragma solidity ^0.8.0;
 
+import "./libraries/FixidityLib.sol";
+
 // TODO: variable packing (uint8 for uint256 in some structs)
 
 import "hardhat/console.sol";
@@ -9,6 +11,7 @@ import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 
 contract DiveBar is ReentrancyGuard {
+    using FixidityLib for *;
     using SafeMath for uint256;
 
     uint256 private _cgid = 0;
