@@ -43,7 +43,7 @@ describe("Main suite", function () {
         );
         expect(ethers.utils.formatEther(contractBalance)).to.equal('0.5');
     
-        config.players.reduce(async (memo, player) => {
+        await config.players.reduce(async (memo, player) => {
             await memo;
             // Add a new deposit from addr1
             // Send ether to the contract
@@ -177,7 +177,6 @@ describe("Main suite", function () {
   });
 
   it("Should not be able to payout and create new game before current is over", async function () {
-
     const [owner, addr1, addr2] = await ethers.getSigners();
     const [depositContract] = await setUpGame({
         numPlayers: 2,
