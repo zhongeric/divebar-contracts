@@ -53,7 +53,7 @@ describe("Main suite", function () {
             let signerBalance = await ethers.provider.getBalance(player.signer.address);
             expect(ethers.utils.formatEther(signerBalance)).to.equal(SIGNER_INITIAL_BALANCE);
             const depositAmount = ethers.utils.parseEther(player.bet);
-                await player.signer.sendTransaction({
+            await player.signer.sendTransaction({
                     to: depositContract.address,
                     value: depositAmount,
             });

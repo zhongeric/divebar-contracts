@@ -59,7 +59,7 @@ contract DiveBar is ReentrancyGuard {
         games[_cgid].id = _cgid;
         // We want the game to last between 30 minutes and an hour
         // make a decoy contract to mirror this but with time skipping perms
-        games[_cgid].timeLimit = 15 seconds;
+        games[_cgid].timeLimit = 5 minutes;
         games[_cgid].minDeposit = DEFAULT_MIN_DEPOSIT;
         games[_cgid].pot = DEFAULT_POT;
         games[_cgid].avg = DEFAULT_AVG;
@@ -214,7 +214,7 @@ contract DiveBar is ReentrancyGuard {
         _cgid += 1;
         // Game storage currentGame = games[_cgid];
         games[_cgid].id = _cgid;
-        games[_cgid].timeLimit = 15 seconds;
+        games[_cgid].timeLimit = 5 minutes;
         games[_cgid].minDeposit = DEFAULT_MIN_DEPOSIT;
         games[_cgid].pot = DEFAULT_POT;
         games[_cgid].avg = DEFAULT_AVG;
