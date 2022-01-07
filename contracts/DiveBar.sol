@@ -80,6 +80,7 @@ contract DiveBar is ReentrancyGuard {
             games[_cgid].existingPlayers[msg.sender] == 0,
             "You are already in the game"
         );
+
         // make sure the game is not over
         require(games[_cgid].endingAt > block.timestamp, "The game has ended");
 
@@ -185,22 +186,12 @@ contract DiveBar is ReentrancyGuard {
         );
         FixidityLib.Fraction memory fixedPlayerRelativeIdx = FixidityLib
             .newFixedFraction(playerIdx, games[_cgid].playersSize);
-        // console.log(
-        //     "fixedPlayerRelativeIdx: ",
-        //     FixidityLib.integer(fixedPlayerRelativeIdx).value,
-        //     ".",
-        //     FixidityLib.fractional(fixedPlayerRelativeIdx).value
-        // );
+
         FixidityLib.Fraction
             memory fixedPlayerRelativeCurveWeight = normalizedTimePenaltyCurve(
                 fixedPlayerRelativeIdx
             );
-        // console.log(
-        //     "fixedPlayerRelativeCurveWeight: ",
-        //     FixidityLib.integer(fixedPlayerRelativeCurveWeight).value,
-        //     ".",
-        //     FixidityLib.fractional(fixedPlayerRelativeCurveWeight).value
-        // );
+
         games[_cgid]
             .players[playerIdx]
             .curveWeight = fixedPlayerRelativeCurveWeight;
