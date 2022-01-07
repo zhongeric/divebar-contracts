@@ -188,8 +188,8 @@ contract DiveBar is ReentrancyGuard, KeeperCompatible {
     function getPayout() external payable {
         require(balances[msg.sender] > 0, "You have no winnings");
         // prevent reentrancy
-        balances[msg.sender] = 0;
         sendViaCall(payable(msg.sender), balances[msg.sender]);
+        balances[msg.sender] = 0;
         return;
     }
 

@@ -78,8 +78,7 @@ describe("Main suite", function () {
     
     await fastForward(DEFAULT_GAME_TIME);
 
-    await owner.call(depositContract.adminCallHandleGameOver)
-    // await depositContract.adminCallHandleGameOver();
+    await depositContract.adminCallHandleGameOver();
 
     gameInfo = await depositContract.getGameInfo();
     expect(gameInfo.id.toString()).to.equal('1');
