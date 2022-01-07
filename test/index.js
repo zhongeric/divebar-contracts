@@ -7,30 +7,16 @@ function sleep(ms) {
     });
 }
 
+async function fastForward(duration) {
+    await hre.ethers.provider.send('evm_increaseTime', [duration]);
+}
+
 const SIGNER_INITIAL_BALANCE = "10000.0";
 const INTIAL_GAME_ID = '0';
-const DEFAULT_GAME_TIME = 5000;
+const DEFAULT_GAME_TIME = 5 * 60 * 1000; // 5 minutes
 
 describe("Main suite", function () {
-
     async function setUpGame(config) {
-        // config schema:
-        /*
-            {
-                {
-                    numPlayers: number,
-                    timeLimit:  number, 
-                    players: [
-                        {
-                            id: number, // addr{id}
-                            signer: addr{id},
-                            bet: str,
-                        }
-                    ]
-                }
-            }
-        */
-
         const [owner] = await ethers.getSigners();
         const depositContractFactory = await ethers.getContractFactory('DiveBar');
         const depositContract = await depositContractFactory.deploy({
@@ -90,9 +76,10 @@ describe("Main suite", function () {
         ]
     });
     
-    await sleep(DEFAULT_GAME_TIME);
+    await fastForward(DEFAULT_GAME_TIME);
 
-    await depositContract.handleGameOver();
+    await owner.call(depositContract.adminCallHandleGameOver)
+    // await depositContract.adminCallHandleGameOver();
 
     gameInfo = await depositContract.getGameInfo();
     expect(gameInfo.id.toString()).to.equal('1');
@@ -124,9 +111,9 @@ describe("Main suite", function () {
         ]
     });
     
-    await sleep(DEFAULT_GAME_TIME);
+    await fastForward(DEFAULT_GAME_TIME);
 
-    await depositContract.handleGameOver();
+    await depositContract.adminCallHandleGameOver();
 
     gameInfo = await depositContract.getGameInfo();
     expect(gameInfo.id.toString()).to.equal('1');
@@ -169,9 +156,9 @@ describe("Main suite", function () {
         ]
     });
     
-    await sleep(DEFAULT_GAME_TIME);
+    await fastForward(DEFAULT_GAME_TIME);
 
-    await depositContract.handleGameOver();
+    await depositContract.adminCallHandleGameOver();
 
     gameInfo = await depositContract.getGameInfo();
     expect(gameInfo.id.toString()).to.equal('1');
@@ -224,7 +211,7 @@ describe("Main suite", function () {
         ]
     });
 
-    const handleGameOverTxn = depositContract.handleGameOver();
+    const handleGameOverTxn = depositContract.adminCallHandleGameOver();
     await expect(handleGameOverTxn).to.be.reverted;
     gameInfo = await depositContract.getGameInfo();
     expect(gameInfo.id.toString()).to.equal('0'); // still current game

@@ -2,26 +2,25 @@
 
 pragma solidity ^0.8.0;
 
+import "hardhat/console.sol";
 import "./libraries/FixidityLib.sol";
 
-// TODO: variable packing (uint8 for uint256 in some structs)
-
-import "hardhat/console.sol";
+import "@chainlink/contracts/src/v0.8/KeeperCompatible.sol";
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/utils/math/SignedSafeMath.sol";
 
-contract DiveBar is ReentrancyGuard {
+contract DiveBar is ReentrancyGuard, KeeperCompatible {
     using FixidityLib for *;
     using SafeMath for uint256;
     using SignedSafeMath for int256;
 
-    uint256 private _scgid = 0;
+    uint256 private _cgid = 0;
     uint256 constant DEFAULT_MIN_DEPOSIT = 0.001 ether;
     uint256 constant DEFAULT_POT = 0 ether;
     uint256 constant DEFAULT_AVG = 0 ether;
     uint256 constant DEFAULT_PLAYERS_SIZE = 0;
-    uint256 private BIG_FACTOR = 1000000;
+    uint256 timeLimit = 5 minutes;
 
     struct Player {
         address addr;
@@ -52,6 +51,11 @@ contract DiveBar is ReentrancyGuard {
     mapping(address => uint256) private balances;
     mapping(uint256 => Game) games;
 
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Sender not authorized.");
+        _;
+    }
+
     constructor() payable {
         owner = payable(msg.sender);
         // Create a new game
@@ -59,7 +63,7 @@ contract DiveBar is ReentrancyGuard {
         games[_cgid].id = _cgid;
         // We want the game to last between 30 minutes and an hour
         // make a decoy contract to mirror this but with time skipping perms
-        games[_cgid].timeLimit = 5 minutes;
+        games[_cgid].timeLimit = timeLimit;
         games[_cgid].minDeposit = DEFAULT_MIN_DEPOSIT;
         games[_cgid].pot = DEFAULT_POT;
         games[_cgid].avg = DEFAULT_AVG;
@@ -70,11 +74,18 @@ contract DiveBar is ReentrancyGuard {
 
     // ----- Priviledged functions -----
 
-    function withdraw(uint256 _amount) external {
-        require(msg.sender == owner, "caller is not owner");
+    function withdraw(uint256 _amount) external onlyOwner {
         payable(msg.sender).transfer(_amount);
         emit Withdraw(msg.sender, _amount);
         return;
+    }
+
+    function adminSetTime(uint256 _time) public onlyOwner {
+        timeLimit = _time;
+    }
+
+    function adminCallHandleGameOver() public onlyOwner {
+        handleGameOver();
     }
 
     // ---- Receive & Fallback ----
@@ -222,7 +233,7 @@ contract DiveBar is ReentrancyGuard {
         return fixedPlayerRelativeCurveWeight;
     }
 
-    function handleGameOver() external {
+    function handleGameOver() internal {
         require(secondsRemaining() == 0, "Game is not over yet");
         if (games[_cgid].playersSize != 0) {
             payoutWinnings();
@@ -231,7 +242,7 @@ contract DiveBar is ReentrancyGuard {
         _cgid += 1;
         // Game storage currentGame = games[_cgid];
         games[_cgid].id = _cgid;
-        games[_cgid].timeLimit = 5 minutes;
+        games[_cgid].timeLimit = timeLimit;
         games[_cgid].minDeposit = DEFAULT_MIN_DEPOSIT;
         games[_cgid].pot = DEFAULT_POT;
         games[_cgid].avg = DEFAULT_AVG;
@@ -338,5 +349,18 @@ contract DiveBar is ReentrancyGuard {
         (bool sent, bytes memory data) = _to.call{value: payout}("");
         require(sent, "Failed to send Ether");
         return;
+    }
+
+    // ----- Keeper functions -----
+    function checkUpkeep(bytes calldata checkData)
+        external
+        override
+        returns (bool upkeepNeeded, bytes memory performData)
+    {
+        upkeepNeeded = (secondsRemaining() == 0);
+    }
+
+    function performUpkeep(bytes calldata performData) external override {
+        handleGameOver();
     }
 }
