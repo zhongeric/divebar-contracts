@@ -16,11 +16,11 @@ contract DiveBar is ReentrancyGuard {
     using SafeMath for uint256;
     using SignedSafeMath for int256;
 
-    uint256 private _cgid = 0;
-    uint256 public constant DEFAULT_MIN_DEPOSIT = 0.001 ether;
-    uint256 public constant DEFAULT_POT = 0 ether;
-    uint256 public constant DEFAULT_AVG = 0 ether;
-    uint256 public constant DEFAULT_PLAYERS_SIZE = 0;
+    uint256 private _scgid = 0;
+    uint256 constant DEFAULT_MIN_DEPOSIT = 0.001 ether;
+    uint256 constant DEFAULT_POT = 0 ether;
+    uint256 constant DEFAULT_AVG = 0 ether;
+    uint256 constant DEFAULT_PLAYERS_SIZE = 0;
     uint256 private BIG_FACTOR = 1000000;
 
     struct Player {
@@ -176,6 +176,8 @@ contract DiveBar is ReentrancyGuard {
     // TODO: add custom amount feature
     function getPayout() external payable {
         require(balances[msg.sender] > 0, "You have no winnings");
+        // prevent reentrancy
+        balances[msg.sender] = 0;
         sendViaCall(payable(msg.sender), balances[msg.sender]);
         return;
     }
