@@ -16,11 +16,11 @@ contract DiveBar is ReentrancyGuard {
     using SafeMath for uint256;
     using SignedSafeMath for int256;
 
-    uint256 private _cgid = 0;
-    uint256 public constant DEFAULT_MIN_DEPOSIT = 0.001 ether;
-    uint256 public constant DEFAULT_POT = 0 ether;
-    uint256 public constant DEFAULT_AVG = 0 ether;
-    uint256 public constant DEFAULT_PLAYERS_SIZE = 0;
+    uint256 private _scgid = 0;
+    uint256 constant DEFAULT_MIN_DEPOSIT = 0.001 ether;
+    uint256 constant DEFAULT_POT = 0 ether;
+    uint256 constant DEFAULT_AVG = 0 ether;
+    uint256 constant DEFAULT_PLAYERS_SIZE = 0;
     uint256 private BIG_FACTOR = 1000000;
 
     struct Player {
@@ -68,18 +68,28 @@ contract DiveBar is ReentrancyGuard {
         games[_cgid].endingAt = block.timestamp + games[_cgid].timeLimit;
     }
 
-    // Function to receive Ether. msg.data must be empty
+    // ----- Priviledged functions -----
+
+    function withdraw(uint256 _amount) external {
+        require(msg.sender == owner, "caller is not owner");
+        payable(msg.sender).transfer(_amount);
+        emit Withdraw(msg.sender, _amount);
+        return;
+    }
+
+    // ---- Receive & Fallback ----
+
     receive() external payable {
         require(
             msg.value >= games[_cgid].minDeposit,
             "Deposit must be greater than or equal to the minimum deposit"
         );
-        // all players are new to the game, can only enter once
         // continue only if the player is not in the game already
         require(
             games[_cgid].existingPlayers[msg.sender] == 0,
             "You are already in the game"
         );
+
         // make sure the game is not over
         require(games[_cgid].endingAt > block.timestamp, "The game has ended");
 
@@ -103,12 +113,14 @@ contract DiveBar is ReentrancyGuard {
     // Fallback function is called when msg.data is not empty
     fallback() external payable {}
 
+    // ---- Public functions ----
+
     // Should this be external or public?
     function getBalance() public view returns (uint256) {
         return address(this).balance;
     }
 
-    function secondsRemaining() public view returns (uint256) {
+    function secondsRemaining() internal returns (uint256) {
         if (games[_cgid].endingAt <= block.timestamp) {
             return 0; // already there
         } else {
@@ -116,7 +128,6 @@ contract DiveBar is ReentrancyGuard {
         }
     }
 
-    // Function to return currentGame info
     function getGameInfo()
         external
         view
@@ -143,16 +154,30 @@ contract DiveBar is ReentrancyGuard {
         );
     }
 
-    function withdraw(uint256 _amount) external {
-        require(msg.sender == owner, "caller is not owner");
-        payable(msg.sender).transfer(_amount);
-        emit Withdraw(msg.sender, _amount);
-        return;
+    function getPlayer(address _addr)
+        external
+        view
+        returns (uint256 bet, uint256 timestamp)
+    {
+        require(
+            games[_cgid].existingPlayers[_addr] != 0,
+            "Player is not in the game"
+        );
+        return (
+            games[_cgid].players[games[_cgid].existingPlayers[_addr]].bet,
+            games[_cgid].players[games[_cgid].existingPlayers[_addr]].timestamp
+        );
+    }
+
+    function getUserBalance(address _addr) external view returns (uint256) {
+        return balances[_addr];
     }
 
     // TODO: add custom amount feature
     function getPayout() external payable {
         require(balances[msg.sender] > 0, "You have no winnings");
+        // prevent reentrancy
+        balances[msg.sender] = 0;
         sendViaCall(payable(msg.sender), balances[msg.sender]);
         return;
     }
@@ -185,22 +210,12 @@ contract DiveBar is ReentrancyGuard {
         );
         FixidityLib.Fraction memory fixedPlayerRelativeIdx = FixidityLib
             .newFixedFraction(playerIdx, games[_cgid].playersSize);
-        // console.log(
-        //     "fixedPlayerRelativeIdx: ",
-        //     FixidityLib.integer(fixedPlayerRelativeIdx).value,
-        //     ".",
-        //     FixidityLib.fractional(fixedPlayerRelativeIdx).value
-        // );
+
         FixidityLib.Fraction
             memory fixedPlayerRelativeCurveWeight = normalizedTimePenaltyCurve(
                 fixedPlayerRelativeIdx
             );
-        // console.log(
-        //     "fixedPlayerRelativeCurveWeight: ",
-        //     FixidityLib.integer(fixedPlayerRelativeCurveWeight).value,
-        //     ".",
-        //     FixidityLib.fractional(fixedPlayerRelativeCurveWeight).value
-        // );
+
         games[_cgid]
             .players[playerIdx]
             .curveWeight = fixedPlayerRelativeCurveWeight;
@@ -209,7 +224,9 @@ contract DiveBar is ReentrancyGuard {
 
     function handleGameOver() external {
         require(secondsRemaining() == 0, "Game is not over yet");
-        payoutWinnings();
+        if (games[_cgid].playersSize != 0) {
+            payoutWinnings();
+        }
         // create a new game
         _cgid += 1;
         // Game storage currentGame = games[_cgid];
