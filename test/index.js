@@ -219,7 +219,11 @@ describe("Main suite", function () {
 
     await fastForward(DEFAULT_GAME_TIME);
 
+    const checkUpkeep = await depositContract.checkUpkeep(0x12);
+    console.log('checkUpkeep:', checkUpkeep);
+
     const anonAdminCallHandleGameOverTxn = depositContract.connect(addr1).adminCallHandleGameOver();
     await expect(anonAdminCallHandleGameOverTxn).to.be.reverted;
+
   });
 });

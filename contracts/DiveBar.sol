@@ -10,7 +10,7 @@ import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/utils/math/SignedSafeMath.sol";
 
-contract DiveBar is ReentrancyGuard, KeeperCompatible {
+contract DiveBar is ReentrancyGuard, KeeperCompatibleInterface {
     using FixidityLib for *;
     using SafeMath for uint256;
     using SignedSafeMath for int256;
@@ -20,7 +20,7 @@ contract DiveBar is ReentrancyGuard, KeeperCompatible {
     uint256 constant DEFAULT_POT = 0 ether;
     uint256 constant DEFAULT_AVG = 0 ether;
     uint256 constant DEFAULT_PLAYERS_SIZE = 0;
-    uint256 timeLimit = 5 minutes;
+    uint256 game_timeLimit = 5 minutes;
 
     struct Player {
         address addr;
@@ -63,7 +63,7 @@ contract DiveBar is ReentrancyGuard, KeeperCompatible {
         games[_cgid].id = _cgid;
         // We want the game to last between 30 minutes and an hour
         // make a decoy contract to mirror this but with time skipping perms
-        games[_cgid].timeLimit = timeLimit;
+        games[_cgid].timeLimit = game_timeLimit;
         games[_cgid].minDeposit = DEFAULT_MIN_DEPOSIT;
         games[_cgid].pot = DEFAULT_POT;
         games[_cgid].avg = DEFAULT_AVG;
@@ -81,7 +81,7 @@ contract DiveBar is ReentrancyGuard, KeeperCompatible {
     }
 
     function adminSetTime(uint256 _time) public onlyOwner {
-        timeLimit = _time;
+        game_timeLimit = _time;
     }
 
     function adminCallHandleGameOver() public onlyOwner {
@@ -242,7 +242,7 @@ contract DiveBar is ReentrancyGuard, KeeperCompatible {
         _cgid += 1;
         // Game storage currentGame = games[_cgid];
         games[_cgid].id = _cgid;
-        games[_cgid].timeLimit = timeLimit;
+        games[_cgid].timeLimit = game_timeLimit;
         games[_cgid].minDeposit = DEFAULT_MIN_DEPOSIT;
         games[_cgid].pot = DEFAULT_POT;
         games[_cgid].avg = DEFAULT_AVG;
@@ -350,15 +350,24 @@ contract DiveBar is ReentrancyGuard, KeeperCompatible {
     }
 
     // ----- Keeper functions -----
-    function checkUpkeep(bytes calldata checkData)
+    function checkUpkeep(
+        bytes calldata /*checkData*/
+    )
         external
         override
-        returns (bool upkeepNeeded, bytes memory performData)
+        returns (
+            bool upkeepNeeded,
+            bytes memory /*performData*/
+        )
     {
-        upkeepNeeded = (secondsRemaining() == 0);
+        // upkeepNeeded = secondsRemaining() == 0;
+        // upkeepNeeded = true;
+        upkeepNeeded = (games[_cgid].endingAt <= block.timestamp);
     }
 
-    function performUpkeep(bytes calldata performData) external override {
+    function performUpkeep(
+        bytes calldata /*performData*/
+    ) external override {
         handleGameOver();
     }
 }
