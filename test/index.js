@@ -216,5 +216,10 @@ describe("Main suite", function () {
     expect(gameInfo.id.toString()).to.equal('0'); // still current game
     expect(ethers.utils.formatEther(gameInfo.pot)).to.equal('18000.0');
     expect(gameInfo.playersSize.toNumber()).to.equal(2);
+
+    await fastForward(DEFAULT_GAME_TIME);
+
+    const anonAdminCallHandleGameOverTxn = depositContract.connect(addr1).adminCallHandleGameOver();
+    await expect(anonAdminCallHandleGameOverTxn).to.be.reverted;
   });
 });
