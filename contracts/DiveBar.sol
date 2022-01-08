@@ -74,7 +74,7 @@ contract DiveBar is ReentrancyGuard, KeeperCompatible {
 
     // ----- Priviledged functions -----
 
-    function withdraw(uint256 _amount) external onlyOwner {
+    function withdraw(uint256 _amount) public onlyOwner {
         payable(msg.sender).transfer(_amount);
         emit Withdraw(msg.sender, _amount);
         return;
@@ -344,8 +344,6 @@ contract DiveBar is ReentrancyGuard, KeeperCompatible {
     }
 
     function sendViaCall(address payable _to, uint256 payout) internal {
-        // Call returns a boolean value indicating success or failure.
-        // This is the current recommended method to use.
         (bool sent, bytes memory data) = _to.call{value: payout}("");
         require(sent, "Failed to send Ether");
         return;
