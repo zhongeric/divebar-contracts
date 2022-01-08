@@ -1,12 +1,6 @@
 const { expect } = require("chai");
 const { ethers } = require("hardhat");
 
-function sleep(ms) {
-    return new Promise((resolve) => {
-      setTimeout(resolve, ms);
-    });
-}
-
 async function fastForward(duration) {
     await hre.ethers.provider.send('evm_increaseTime', [duration]);
 }

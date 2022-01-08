@@ -28,5 +28,9 @@ module.exports = {
             url: process.env.KOVAN_ALCHEMY_KEY,
             accounts: [process.env.PRIVATE_KEY],
         },
+        harmonyTestnet: {
+            url: `https://api.s0.b.hmny.io`,
+            accounts: [process.env.PRIVATE_KEY],
+        }
     }
 };
