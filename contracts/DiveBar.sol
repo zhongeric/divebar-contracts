@@ -88,6 +88,11 @@ contract DiveBar is ReentrancyGuard, KeeperCompatibleInterface {
         handleGameOver();
     }
 
+    // Contract destructor
+    function destroy() public onlyOwner {
+        selfdestruct(owner);
+    }
+
     // ---- Receive & Fallback ----
 
     receive() external payable {
