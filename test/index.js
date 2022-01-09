@@ -39,9 +39,11 @@ describe("Main suite", function () {
             });
 
             let gameInfo = await depositContract.getGameInfo();
+            // console.log(gameInfo);
             expect(gameInfo.id.toString()).to.equal(INTIAL_GAME_ID);
             expect(gameInfo.pot).to.equal(initialGameInfo.pot.add(depositAmount));
-            expect(Number(ethers.utils.formatEther(gameInfo.avg))).to.equal(ethers.utils.formatEther(gameInfo.pot) / gameInfo.playersSize.toNumber());
+            const bnAvg = ethers.BigNumber.from(gameInfo.avg.value);
+            expect(Number(ethers.utils.formatEther(bnAvg))).to.equal(ethers.utils.formatEther(gameInfo.pot) / gameInfo.playersSize.toNumber());
             expect(gameInfo.playersSize.toNumber()).to.equal(player.id); // since indx is 0-based
         }, Promise.resolve())   
         return [depositContract];
@@ -213,8 +215,8 @@ describe("Main suite", function () {
 
     await fastForward(DEFAULT_GAME_TIME);
 
-    const checkUpkeep = await depositContract.checkUpkeep(0x12);
-    console.log('checkUpkeep:', checkUpkeep);
+    // const checkUpkeep = await depositContract.checkUpkeep(0x12);
+    // console.log('checkUpkeep:', checkUpkeep);
 
     const anonAdminCallHandleGameOverTxn = depositContract.connect(addr1).adminCallHandleGameOver();
     await expect(anonAdminCallHandleGameOverTxn).to.be.reverted;

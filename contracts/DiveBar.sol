@@ -18,12 +18,11 @@ contract DiveBar is ReentrancyGuard, KeeperCompatibleInterface {
     uint256 private _cgid = 0;
     uint256 constant DEFAULT_MIN_DEPOSIT = 0.001 ether;
     uint256 constant DEFAULT_POT = 0 ether;
-    uint256 constant DEFAULT_AVG = 0 ether;
     uint256 constant DEFAULT_PLAYERS_SIZE = 0;
     uint256 game_timeLimit = 5 minutes;
 
     // Cummulative of the royalties taken from each game + any swept pot, owned by the contract
-    uint256 royalties = 0;
+    int256 royalties = 0;
 
     struct Player {
         address addr;
@@ -37,10 +36,10 @@ contract DiveBar is ReentrancyGuard, KeeperCompatibleInterface {
         uint256 timeLimit;
         uint256 minDeposit;
         uint256 pot;
-        uint256 avg;
         uint256 playersSize;
         uint256 createdAt;
         uint256 endingAt;
+        FixidityLib.Fraction avg;
         // array of players
         mapping(uint256 => Player) players;
         mapping(address => uint256) existingPlayers;
@@ -69,7 +68,7 @@ contract DiveBar is ReentrancyGuard, KeeperCompatibleInterface {
         games[_cgid].timeLimit = game_timeLimit;
         games[_cgid].minDeposit = DEFAULT_MIN_DEPOSIT;
         games[_cgid].pot = DEFAULT_POT;
-        games[_cgid].avg = DEFAULT_AVG;
+        games[_cgid].avg = FixidityLib.newFixed(0);
         games[_cgid].playersSize = DEFAULT_PLAYERS_SIZE;
         games[_cgid].createdAt = block.timestamp;
         games[_cgid].endingAt = block.timestamp + games[_cgid].timeLimit;
@@ -77,11 +76,12 @@ contract DiveBar is ReentrancyGuard, KeeperCompatibleInterface {
 
     // ----- Priviledged functions -----
 
-    function getRoyalties() public view onlyOwner returns (uint256) {
+    function getRoyalties() public view onlyOwner returns (int256) {
         return royalties;
     }
 
     function withdraw(uint256 _amount) public onlyOwner {
+        SignedSafeMath.sub(royalties, int256(_amount));
         payable(msg.sender).transfer(_amount);
         emit Withdraw(msg.sender, _amount);
         return;
@@ -128,7 +128,10 @@ contract DiveBar is ReentrancyGuard, KeeperCompatibleInterface {
         // Add deposit to the pot
         games[_cgid].pot += msg.value;
         // Calculate the new average
-        games[_cgid].avg = games[_cgid].pot / games[_cgid].playersSize;
+        games[_cgid].avg = FixidityLib.divide(
+            FixidityLib.wrap(games[_cgid].pot),
+            FixidityLib.newFixed(games[_cgid].playersSize)
+        );
         // emit Deposit event
         emit Deposit(msg.sender, msg.value);
     }
@@ -159,10 +162,10 @@ contract DiveBar is ReentrancyGuard, KeeperCompatibleInterface {
             uint256 timeLimit,
             uint256 minDeposit,
             uint256 pot,
-            uint256 avg,
             uint256 playersSize,
             uint256 createdAt,
-            uint256 endingAt
+            uint256 endingAt,
+            FixidityLib.Fraction memory avg
         )
     {
         return (
@@ -170,10 +173,10 @@ contract DiveBar is ReentrancyGuard, KeeperCompatibleInterface {
             games[_cgid].timeLimit,
             games[_cgid].minDeposit,
             games[_cgid].pot,
-            games[_cgid].avg,
             games[_cgid].playersSize,
             games[_cgid].createdAt,
-            games[_cgid].endingAt
+            games[_cgid].endingAt,
+            games[_cgid].avg
         );
     }
 
@@ -257,7 +260,7 @@ contract DiveBar is ReentrancyGuard, KeeperCompatibleInterface {
         games[_cgid].timeLimit = game_timeLimit;
         games[_cgid].minDeposit = DEFAULT_MIN_DEPOSIT;
         games[_cgid].pot = DEFAULT_POT;
-        games[_cgid].avg = DEFAULT_AVG;
+        games[_cgid].avg = FixidityLib.newFixed(0);
         games[_cgid].playersSize = DEFAULT_PLAYERS_SIZE;
         games[_cgid].createdAt = block.timestamp;
         games[_cgid].endingAt = block.timestamp + games[_cgid].timeLimit;
@@ -275,7 +278,12 @@ contract DiveBar is ReentrancyGuard, KeeperCompatibleInterface {
         uint256 losersPot = 0;
         for (uint256 i = 1; i <= games[_cgid].playersSize; i++) {
             // TODO: do you need to bet more than the average or is equal to okay?
-            if (games[_cgid].players[i].bet < games[_cgid].avg) {
+            if (
+                FixidityLib.lt(
+                    FixidityLib.wrap(games[_cgid].players[i].bet),
+                    games[_cgid].avg
+                )
+            ) {
                 numLosers += 1;
                 losersPot += games[_cgid].players[i].bet;
             } else {
@@ -296,7 +304,12 @@ contract DiveBar is ReentrancyGuard, KeeperCompatibleInterface {
         }
 
         for (uint256 i = 1; i <= games[_cgid].playersSize; i++) {
-            if (games[_cgid].players[i].bet >= games[_cgid].avg) {
+            if (
+                FixidityLib.gte(
+                    FixidityLib.wrap(games[_cgid].players[i].bet),
+                    games[_cgid].avg
+                )
+            ) {
                 console.log("------------ Winner Player ", i, " ------------");
                 uint256 additionalWinnings = 0;
                 if (losersPot != 0) {
@@ -342,7 +355,7 @@ contract DiveBar is ReentrancyGuard, KeeperCompatibleInterface {
         }
         console.log("Pot: ", games[_cgid].pot);
         if (games[_cgid].pot > 0) {
-            royalties += games[_cgid].pot;
+            SignedSafeMath.add(royalties, int256(games[_cgid].pot));
             emit Payout(owner, games[_cgid].pot);
             games[_cgid].pot = 0;
             console.log("Remaining pot swept to: ", owner);
