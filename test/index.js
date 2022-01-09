@@ -1,36 +1,16 @@
 const { expect } = require("chai");
 const { ethers } = require("hardhat");
 
-function sleep(ms) {
-    return new Promise((resolve) => {
-      setTimeout(resolve, ms);
-    });
+async function fastForward(duration) {
+    await hre.ethers.provider.send('evm_increaseTime', [duration]);
 }
 
 const SIGNER_INITIAL_BALANCE = "10000.0";
 const INTIAL_GAME_ID = '0';
-const DEFAULT_GAME_TIME = 5000;
+const DEFAULT_GAME_TIME = 5 * 60 * 1000; // 5 minutes
 
 describe("Main suite", function () {
-
     async function setUpGame(config) {
-        // config schema:
-        /*
-            {
-                {
-                    numPlayers: number,
-                    timeLimit:  number, 
-                    players: [
-                        {
-                            id: number, // addr{id}
-                            signer: addr{id},
-                            bet: str,
-                        }
-                    ]
-                }
-            }
-        */
-
         const [owner] = await ethers.getSigners();
         const depositContractFactory = await ethers.getContractFactory('DiveBar');
         const depositContract = await depositContractFactory.deploy({
@@ -59,9 +39,11 @@ describe("Main suite", function () {
             });
 
             let gameInfo = await depositContract.getGameInfo();
+            // console.log(gameInfo);
             expect(gameInfo.id.toString()).to.equal(INTIAL_GAME_ID);
             expect(gameInfo.pot).to.equal(initialGameInfo.pot.add(depositAmount));
-            expect(Number(ethers.utils.formatEther(gameInfo.avg))).to.equal(ethers.utils.formatEther(gameInfo.pot) / gameInfo.playersSize.toNumber());
+            const bnAvg = ethers.BigNumber.from(gameInfo.avg.value);
+            expect(Number(ethers.utils.formatEther(bnAvg))).to.equal(ethers.utils.formatEther(gameInfo.pot) / gameInfo.playersSize.toNumber());
             expect(gameInfo.playersSize.toNumber()).to.equal(player.id); // since indx is 0-based
         }, Promise.resolve())   
         return [depositContract];
@@ -90,9 +72,9 @@ describe("Main suite", function () {
         ]
     });
     
-    await sleep(DEFAULT_GAME_TIME);
+    await fastForward(DEFAULT_GAME_TIME);
 
-    await depositContract.handleGameOver();
+    await depositContract.adminCallHandleGameOver();
 
     gameInfo = await depositContract.getGameInfo();
     expect(gameInfo.id.toString()).to.equal('1');
@@ -124,9 +106,9 @@ describe("Main suite", function () {
         ]
     });
     
-    await sleep(DEFAULT_GAME_TIME);
+    await fastForward(DEFAULT_GAME_TIME);
 
-    await depositContract.handleGameOver();
+    await depositContract.adminCallHandleGameOver();
 
     gameInfo = await depositContract.getGameInfo();
     expect(gameInfo.id.toString()).to.equal('1');
@@ -169,9 +151,9 @@ describe("Main suite", function () {
         ]
     });
     
-    await sleep(DEFAULT_GAME_TIME);
+    await fastForward(DEFAULT_GAME_TIME);
 
-    await depositContract.handleGameOver();
+    await depositContract.adminCallHandleGameOver();
 
     gameInfo = await depositContract.getGameInfo();
     expect(gameInfo.id.toString()).to.equal('1');
@@ -224,11 +206,20 @@ describe("Main suite", function () {
         ]
     });
 
-    const handleGameOverTxn = depositContract.handleGameOver();
+    const handleGameOverTxn = depositContract.adminCallHandleGameOver();
     await expect(handleGameOverTxn).to.be.reverted;
     gameInfo = await depositContract.getGameInfo();
     expect(gameInfo.id.toString()).to.equal('0'); // still current game
     expect(ethers.utils.formatEther(gameInfo.pot)).to.equal('18000.0');
     expect(gameInfo.playersSize.toNumber()).to.equal(2);
+
+    await fastForward(DEFAULT_GAME_TIME);
+
+    // const checkUpkeep = await depositContract.checkUpkeep(0x12);
+    // console.log('checkUpkeep:', checkUpkeep);
+
+    const anonAdminCallHandleGameOverTxn = depositContract.connect(addr1).adminCallHandleGameOver();
+    await expect(anonAdminCallHandleGameOverTxn).to.be.reverted;
+
   });
 });

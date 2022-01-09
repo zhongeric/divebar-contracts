@@ -2,26 +2,27 @@
 
 pragma solidity ^0.8.0;
 
+import "hardhat/console.sol";
 import "./libraries/FixidityLib.sol";
 
-// TODO: variable packing (uint8 for uint256 in some structs)
-
-import "hardhat/console.sol";
+import "@chainlink/contracts/src/v0.8/KeeperCompatible.sol";
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/utils/math/SignedSafeMath.sol";
 
-contract DiveBar is ReentrancyGuard {
+contract DiveBar is ReentrancyGuard, KeeperCompatibleInterface {
     using FixidityLib for *;
     using SafeMath for uint256;
     using SignedSafeMath for int256;
 
-    uint256 private _scgid = 0;
+    uint256 private _cgid = 0;
     uint256 constant DEFAULT_MIN_DEPOSIT = 0.001 ether;
     uint256 constant DEFAULT_POT = 0 ether;
-    uint256 constant DEFAULT_AVG = 0 ether;
     uint256 constant DEFAULT_PLAYERS_SIZE = 0;
-    uint256 private BIG_FACTOR = 1000000;
+    uint256 game_timeLimit = 5 minutes;
+
+    // Cummulative of the royalties taken from each game + any swept pot, owned by the contract
+    int256 royalties = 0;
 
     struct Player {
         address addr;
@@ -35,10 +36,10 @@ contract DiveBar is ReentrancyGuard {
         uint256 timeLimit;
         uint256 minDeposit;
         uint256 pot;
-        uint256 avg;
         uint256 playersSize;
         uint256 createdAt;
         uint256 endingAt;
+        FixidityLib.Fraction avg;
         // array of players
         mapping(uint256 => Player) players;
         mapping(address => uint256) existingPlayers;
@@ -52,6 +53,11 @@ contract DiveBar is ReentrancyGuard {
     mapping(address => uint256) private balances;
     mapping(uint256 => Game) games;
 
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Sender not authorized.");
+        _;
+    }
+
     constructor() payable {
         owner = payable(msg.sender);
         // Create a new game
@@ -59,10 +65,10 @@ contract DiveBar is ReentrancyGuard {
         games[_cgid].id = _cgid;
         // We want the game to last between 30 minutes and an hour
         // make a decoy contract to mirror this but with time skipping perms
-        games[_cgid].timeLimit = 5 minutes;
+        games[_cgid].timeLimit = game_timeLimit;
         games[_cgid].minDeposit = DEFAULT_MIN_DEPOSIT;
         games[_cgid].pot = DEFAULT_POT;
-        games[_cgid].avg = DEFAULT_AVG;
+        games[_cgid].avg = FixidityLib.newFixed(0);
         games[_cgid].playersSize = DEFAULT_PLAYERS_SIZE;
         games[_cgid].createdAt = block.timestamp;
         games[_cgid].endingAt = block.timestamp + games[_cgid].timeLimit;
@@ -70,11 +76,28 @@ contract DiveBar is ReentrancyGuard {
 
     // ----- Priviledged functions -----
 
-    function withdraw(uint256 _amount) external {
-        require(msg.sender == owner, "caller is not owner");
+    function getRoyalties() public view onlyOwner returns (int256) {
+        return royalties;
+    }
+
+    function withdraw(uint256 _amount) public onlyOwner {
+        SignedSafeMath.sub(royalties, int256(_amount));
         payable(msg.sender).transfer(_amount);
         emit Withdraw(msg.sender, _amount);
         return;
+    }
+
+    function adminSetTime(uint256 _time) public onlyOwner {
+        game_timeLimit = _time;
+    }
+
+    function adminCallHandleGameOver() public onlyOwner {
+        handleGameOver();
+    }
+
+    // Contract destructor
+    function destroy() public onlyOwner {
+        selfdestruct(owner);
     }
 
     // ---- Receive & Fallback ----
@@ -105,7 +128,10 @@ contract DiveBar is ReentrancyGuard {
         // Add deposit to the pot
         games[_cgid].pot += msg.value;
         // Calculate the new average
-        games[_cgid].avg = games[_cgid].pot / games[_cgid].playersSize;
+        games[_cgid].avg = FixidityLib.divide(
+            FixidityLib.wrap(games[_cgid].pot),
+            FixidityLib.newFixed(games[_cgid].playersSize)
+        );
         // emit Deposit event
         emit Deposit(msg.sender, msg.value);
     }
@@ -120,7 +146,7 @@ contract DiveBar is ReentrancyGuard {
         return address(this).balance;
     }
 
-    function secondsRemaining() internal returns (uint256) {
+    function secondsRemaining() internal view returns (uint256) {
         if (games[_cgid].endingAt <= block.timestamp) {
             return 0; // already there
         } else {
@@ -136,10 +162,10 @@ contract DiveBar is ReentrancyGuard {
             uint256 timeLimit,
             uint256 minDeposit,
             uint256 pot,
-            uint256 avg,
             uint256 playersSize,
             uint256 createdAt,
-            uint256 endingAt
+            uint256 endingAt,
+            FixidityLib.Fraction memory avg
         )
     {
         return (
@@ -147,10 +173,10 @@ contract DiveBar is ReentrancyGuard {
             games[_cgid].timeLimit,
             games[_cgid].minDeposit,
             games[_cgid].pot,
-            games[_cgid].avg,
             games[_cgid].playersSize,
             games[_cgid].createdAt,
-            games[_cgid].endingAt
+            games[_cgid].endingAt,
+            games[_cgid].avg
         );
     }
 
@@ -177,8 +203,8 @@ contract DiveBar is ReentrancyGuard {
     function getPayout() external payable {
         require(balances[msg.sender] > 0, "You have no winnings");
         // prevent reentrancy
-        balances[msg.sender] = 0;
         sendViaCall(payable(msg.sender), balances[msg.sender]);
+        balances[msg.sender] = 0;
         return;
     }
 
@@ -222,7 +248,7 @@ contract DiveBar is ReentrancyGuard {
         return fixedPlayerRelativeCurveWeight;
     }
 
-    function handleGameOver() external {
+    function handleGameOver() internal {
         require(secondsRemaining() == 0, "Game is not over yet");
         if (games[_cgid].playersSize != 0) {
             payoutWinnings();
@@ -231,10 +257,10 @@ contract DiveBar is ReentrancyGuard {
         _cgid += 1;
         // Game storage currentGame = games[_cgid];
         games[_cgid].id = _cgid;
-        games[_cgid].timeLimit = 5 minutes;
+        games[_cgid].timeLimit = game_timeLimit;
         games[_cgid].minDeposit = DEFAULT_MIN_DEPOSIT;
         games[_cgid].pot = DEFAULT_POT;
-        games[_cgid].avg = DEFAULT_AVG;
+        games[_cgid].avg = FixidityLib.newFixed(0);
         games[_cgid].playersSize = DEFAULT_PLAYERS_SIZE;
         games[_cgid].createdAt = block.timestamp;
         games[_cgid].endingAt = block.timestamp + games[_cgid].timeLimit;
@@ -252,7 +278,12 @@ contract DiveBar is ReentrancyGuard {
         uint256 losersPot = 0;
         for (uint256 i = 1; i <= games[_cgid].playersSize; i++) {
             // TODO: do you need to bet more than the average or is equal to okay?
-            if (games[_cgid].players[i].bet < games[_cgid].avg) {
+            if (
+                FixidityLib.lt(
+                    FixidityLib.wrap(games[_cgid].players[i].bet),
+                    games[_cgid].avg
+                )
+            ) {
                 numLosers += 1;
                 losersPot += games[_cgid].players[i].bet;
             } else {
@@ -273,7 +304,12 @@ contract DiveBar is ReentrancyGuard {
         }
 
         for (uint256 i = 1; i <= games[_cgid].playersSize; i++) {
-            if (games[_cgid].players[i].bet >= games[_cgid].avg) {
+            if (
+                FixidityLib.gte(
+                    FixidityLib.wrap(games[_cgid].players[i].bet),
+                    games[_cgid].avg
+                )
+            ) {
                 console.log("------------ Winner Player ", i, " ------------");
                 uint256 additionalWinnings = 0;
                 if (losersPot != 0) {
@@ -319,9 +355,9 @@ contract DiveBar is ReentrancyGuard {
         }
         console.log("Pot: ", games[_cgid].pot);
         if (games[_cgid].pot > 0) {
-            // TODO: keep remaining funds in contract so do nothing?
+            SignedSafeMath.add(royalties, int256(games[_cgid].pot));
+            emit Payout(owner, games[_cgid].pot);
             games[_cgid].pot = 0;
-            emit Payout(owner, msg.value);
             console.log("Remaining pot swept to: ", owner);
         }
 
@@ -333,10 +369,29 @@ contract DiveBar is ReentrancyGuard {
     }
 
     function sendViaCall(address payable _to, uint256 payout) internal {
-        // Call returns a boolean value indicating success or failure.
-        // This is the current recommended method to use.
         (bool sent, bytes memory data) = _to.call{value: payout}("");
         require(sent, "Failed to send Ether");
         return;
+    }
+
+    // ----- Keeper functions -----
+    function checkUpkeep(
+        bytes calldata /*checkData*/
+    )
+        external
+        override
+        returns (
+            bool upkeepNeeded,
+            bytes memory /*performData*/
+        )
+    {
+        // upkeepNeeded = true;
+        upkeepNeeded = (games[_cgid].endingAt <= block.timestamp);
+    }
+
+    function performUpkeep(
+        bytes calldata /*performData*/
+    ) external override {
+        handleGameOver();
     }
 }
