@@ -22,6 +22,9 @@ contract DiveBar is ReentrancyGuard, KeeperCompatibleInterface {
     uint256 constant DEFAULT_PLAYERS_SIZE = 0;
     uint256 game_timeLimit = 5 minutes;
 
+    // Cummulative of the royalties taken from each game + any swept pot, owned by the contract
+    uint256 royalties = 0;
+
     struct Player {
         address addr;
         uint256 bet;
@@ -73,6 +76,10 @@ contract DiveBar is ReentrancyGuard, KeeperCompatibleInterface {
     }
 
     // ----- Priviledged functions -----
+
+    function getRoyalties() public view onlyOwner returns (uint256) {
+        return royalties;
+    }
 
     function withdraw(uint256 _amount) public onlyOwner {
         payable(msg.sender).transfer(_amount);
@@ -136,7 +143,7 @@ contract DiveBar is ReentrancyGuard, KeeperCompatibleInterface {
         return address(this).balance;
     }
 
-    function secondsRemaining() internal returns (uint256) {
+    function secondsRemaining() internal view returns (uint256) {
         if (games[_cgid].endingAt <= block.timestamp) {
             return 0; // already there
         } else {
@@ -335,9 +342,9 @@ contract DiveBar is ReentrancyGuard, KeeperCompatibleInterface {
         }
         console.log("Pot: ", games[_cgid].pot);
         if (games[_cgid].pot > 0) {
-            // TODO: keep remaining funds in contract so do nothing?
+            royalties += games[_cgid].pot;
+            emit Payout(owner, games[_cgid].pot);
             games[_cgid].pot = 0;
-            emit Payout(owner, msg.value);
             console.log("Remaining pot swept to: ", owner);
         }
 
@@ -365,7 +372,6 @@ contract DiveBar is ReentrancyGuard, KeeperCompatibleInterface {
             bytes memory /*performData*/
         )
     {
-        // upkeepNeeded = secondsRemaining() == 0;
         // upkeepNeeded = true;
         upkeepNeeded = (games[_cgid].endingAt <= block.timestamp);
     }
