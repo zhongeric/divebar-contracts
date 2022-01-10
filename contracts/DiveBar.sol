@@ -19,7 +19,7 @@ contract DiveBar is ReentrancyGuard, KeeperCompatibleInterface {
     uint256 constant DEFAULT_MIN_DEPOSIT = 0.001 ether;
     uint256 constant DEFAULT_POT = 0 ether;
     uint256 constant DEFAULT_PLAYERS_SIZE = 0;
-    uint256 game_timeLimit = 5 minutes;
+    uint256 game_timeLimit = 10 minutes;
 
     // Cummulative of the royalties taken from each game + any swept pot, owned by the contract
     int256 royalties = 0;
