@@ -277,7 +277,6 @@ contract DiveBar is ReentrancyGuard, KeeperCompatibleInterface {
         );
         uint256 losersPot = 0;
         for (uint256 i = 1; i <= games[_cgid].playersSize; i++) {
-            // TODO: do you need to bet more than the average or is equal to okay?
             if (
                 FixidityLib.lt(
                     FixidityLib.wrap(games[_cgid].players[i].bet),

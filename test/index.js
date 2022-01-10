@@ -62,13 +62,13 @@ describe("Main suite", function () {
             {
                 id: 1,
                 signer: addr1,
-                bet: '0.001',
+                bet: '100',
             },
-            {
-                id: 2,
-                signer: addr2,
-                bet: '9000',
-            },
+            // {
+            //     id: 2,
+            //     signer: addr2,
+            //     bet: '9000',
+            // },
         ]
     });
     
@@ -81,10 +81,10 @@ describe("Main suite", function () {
     expect(ethers.utils.formatEther(gameInfo.pot)).to.equal('0.0');
     expect(gameInfo.playersSize.toNumber()).to.equal(0);
 
-    await depositContract.connect(addr2).getPayout();
-    let addr2Balance = await ethers.provider.getBalance(addr2.address);
-    expect(Number(ethers.utils.formatEther(addr2Balance))).to.be.closeTo(10000, 10);
-    console.log('addr2 balance:', ethers.utils.formatEther(addr2Balance));
+    await depositContract.connect(addr1).getPayout();
+    let addr1Balance = await ethers.provider.getBalance(addr1.address);
+    expect(Number(ethers.utils.formatEther(addr1Balance))).to.be.closeTo(10000, 10);
+    console.log('addr1 balance:', ethers.utils.formatEther(addr1Balance));
   });
   it('Correctly handles games with only one player', async function () {
     const [owner, addr1] = await ethers.getSigners();
