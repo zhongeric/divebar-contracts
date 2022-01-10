@@ -312,17 +312,21 @@ contract DiveBar is ReentrancyGuard, KeeperCompatibleInterface {
             ) {
                 console.log("------------ Winner Player ", i, " ------------");
                 uint256 additionalWinnings = 0;
+                FixidityLib.Fraction memory computedWeight = FixidityLib
+                    .newFixed(0);
+                // If only one winner who is last player, do they get any of the losers pot?
+                if (FixidityLib.unwrap(winnersAbsWeightSum) != 0) {
+                    computedWeight = FixidityLib.newFixedFraction(
+                        FixidityLib.unwrap(games[_cgid].players[i].curveWeight),
+                        FixidityLib.unwrap(winnersAbsWeightSum)
+                    );
+                }
                 if (losersPot != 0) {
                     additionalWinnings = FixidityLib.unwrap(
                         FixidityLib.multiply(
                             FixidityLib.multiply(
                                 FixidityLib.wrap(losersPot),
-                                FixidityLib.newFixedFraction(
-                                    FixidityLib.unwrap(
-                                        games[_cgid].players[i].curveWeight
-                                    ),
-                                    FixidityLib.unwrap(winnersAbsWeightSum)
-                                )
+                                computedWeight
                             ),
                             // TODO: platform fee should be taken out either the total pot or every payout, i think they are equivalent though
                             FixidityLib.newFixedFraction(99, 100) // Platform fee of 1%

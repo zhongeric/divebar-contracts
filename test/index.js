@@ -62,7 +62,7 @@ describe("Main suite", function () {
             {
                 id: 1,
                 signer: addr1,
-                bet: '9000',
+                bet: '0.001',
             },
             {
                 id: 2,
@@ -80,12 +80,6 @@ describe("Main suite", function () {
     expect(gameInfo.id.toString()).to.equal('1');
     expect(ethers.utils.formatEther(gameInfo.pot)).to.equal('0.0');
     expect(gameInfo.playersSize.toNumber()).to.equal(0);
-
-    // Verify the payouts have been sent correctly
-    await depositContract.connect(addr1).getPayout();
-    addr1Balance = await ethers.provider.getBalance(addr1.address);
-    expect(Number(ethers.utils.formatEther(addr1Balance))).to.be.closeTo(10000, 10);
-    console.log('addr1 balance:', ethers.utils.formatEther(addr1Balance));
 
     await depositContract.connect(addr2).getPayout();
     let addr2Balance = await ethers.provider.getBalance(addr2.address);
