@@ -19,7 +19,7 @@ contract DiveBar is ReentrancyGuard, KeeperCompatibleInterface {
     uint256 constant DEFAULT_MIN_DEPOSIT = 0.001 ether;
     uint256 constant DEFAULT_POT = 0 ether;
     uint256 constant DEFAULT_PLAYERS_SIZE = 0;
-    uint256 game_timeLimit = 10 minutes;
+    uint256 game_timeLimit = 12 hours; // for mainnet
 
     // Cummulative of the royalties taken from each game + any swept pot, owned by the contract
     int256 royalties = 0;
@@ -53,8 +53,12 @@ contract DiveBar is ReentrancyGuard, KeeperCompatibleInterface {
     mapping(address => uint256) private balances;
     mapping(uint256 => Game) games;
 
-    modifier onlyOwner() {
+    function _onlyOwner() private view {
         require(msg.sender == owner, "Sender not authorized.");
+    }
+
+    modifier onlyOwner() {
+        _onlyOwner();
         _;
     }
 
@@ -268,7 +272,6 @@ contract DiveBar is ReentrancyGuard, KeeperCompatibleInterface {
     }
 
     function payoutWinnings() internal {
-        console.log("Paying out winners of game", games[_cgid].id);
         // Calculate number of losers
         uint256 numLosers = 0;
         uint256 numWinners = 0;
@@ -292,13 +295,9 @@ contract DiveBar is ReentrancyGuard, KeeperCompatibleInterface {
                 );
             }
         }
-        console.log("numLosers: ", numLosers);
-        console.log("losersPot: ", losersPot);
 
         numWinners = games[_cgid].playersSize - numLosers;
-        console.log("numWinners: ", numWinners);
         if (numWinners == 0) {
-            console.log("No winners");
             return;
         }
 
@@ -309,7 +308,6 @@ contract DiveBar is ReentrancyGuard, KeeperCompatibleInterface {
                     games[_cgid].avg
                 )
             ) {
-                console.log("------------ Winner Player ", i, " ------------");
                 uint256 additionalWinnings = 0;
                 FixidityLib.Fraction memory computedWeight = FixidityLib
                     .newFixed(0);
@@ -335,33 +333,18 @@ contract DiveBar is ReentrancyGuard, KeeperCompatibleInterface {
 
                 uint256 payout = games[_cgid].players[i].bet +
                     additionalWinnings;
-
-                console.log("bet: ", games[_cgid].players[i].bet);
-                console.log(
-                    "curveWeight: ",
-                    games[_cgid].players[i].curveWeight.value
-                );
-                console.log(
-                    "winnersTotalCurveWeightSum: ",
-                    winnersAbsWeightSum.value
-                );
-                console.log("winnings from loser pot: ", additionalWinnings);
-                console.log("payout: ", payout);
                 // Update player's balance
                 balances[games[_cgid].players[i].addr] += payout;
                 // subtract payout from pot
                 games[_cgid].pot -= payout;
                 // emit Payout event
                 emit Payout(games[_cgid].players[i].addr, payout);
-                console.log("Payout sent to: ", games[_cgid].players[i].addr);
             }
         }
-        console.log("Pot: ", games[_cgid].pot);
         if (games[_cgid].pot > 0) {
             SignedSafeMath.add(royalties, int256(games[_cgid].pot));
             emit Payout(owner, games[_cgid].pot);
             games[_cgid].pot = 0;
-            console.log("Remaining pot swept to: ", owner);
         }
 
         delete numLosers;
