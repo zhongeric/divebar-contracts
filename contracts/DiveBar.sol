@@ -5,12 +5,11 @@ pragma solidity ^0.8.0;
 import "hardhat/console.sol";
 import "./libraries/FixidityLib.sol";
 
-import "@chainlink/contracts/src/v0.8/KeeperCompatible.sol";
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/utils/math/SignedSafeMath.sol";
 
-contract DiveBar is ReentrancyGuard, KeeperCompatibleInterface {
+contract DiveBar is ReentrancyGuard {
     using FixidityLib for *;
     using SafeMath for uint256;
     using SignedSafeMath for int256;
@@ -355,29 +354,8 @@ contract DiveBar is ReentrancyGuard, KeeperCompatibleInterface {
     }
 
     function sendViaCall(address payable _to, uint256 payout) internal {
-        (bool sent, bytes memory data) = _to.call{value: payout}("");
+        (bool sent,) = _to.call{value: payout}("");
         require(sent, "Failed to send Ether");
         return;
-    }
-
-    // ----- Keeper functions -----
-    function checkUpkeep(
-        bytes calldata /*checkData*/
-    )
-        external
-        override
-        returns (
-            bool upkeepNeeded,
-            bytes memory /*performData*/
-        )
-    {
-        // upkeepNeeded = true;
-        upkeepNeeded = (games[_cgid].endingAt <= block.timestamp);
-    }
-
-    function performUpkeep(
-        bytes calldata /*performData*/
-    ) external override {
-        handleGameOver();
     }
 }
